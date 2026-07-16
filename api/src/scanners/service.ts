@@ -1,3 +1,8 @@
+/**
+ * Exchangewide Volume Gate (EVG) service.
+ * Product name for exchange_scanners / warm_symbols cron + queue batch.
+ * Internal identifiers keep the "scanner" prefix; EVG is the product alias.
+ */
 import { createMarketDataService, type MarketEnv } from "../market/service";
 import {
   clearStaleWarmSymbols,
@@ -13,6 +18,7 @@ import {
   updateScanner,
   upsertWarmSymbols,
 } from "./repo";
+import { parseAnalysisJson } from "../analysis/types";
 import {
   addHours,
   approxDailyValue,
@@ -130,6 +136,7 @@ export async function patchScanner(
   };
 }
 
+/** Start an EVG run (manual or cron) and enqueue the first page. */
 export async function startScannerRun(
   env: ScannerEnv,
   scannerId: string,
@@ -169,6 +176,7 @@ export async function startScannerRun(
   return serializeRun(run);
 }
 
+/** EVG cron: start due enabled exchange gates. */
 export async function processDueScanners(env: ScannerEnv): Promise<number> {
   const due = await listDueScanners(env.DB, nowIso());
   let started = 0;
@@ -188,6 +196,7 @@ export async function processDueScanners(env: ScannerEnv): Promise<number> {
   return started;
 }
 
+/** Process one EVG page: screen exchange, apply volume gate, upsert warm symbols. */
 export async function processScannerJob(
   env: ScannerEnv,
   message: ScannerJobMessage,
@@ -398,6 +407,9 @@ function serializeWarmSymbol(
     approxDailyValue: row.approx_daily_value,
     currency: row.currency,
     lastSeenAt: row.last_seen_at,
+    analyzedAt: row.analyzed_at ?? null,
+    analysisRunId: row.analysis_run_id ?? null,
+    analysis: parseAnalysisJson(row.analysis_json ?? null),
   };
 }
 

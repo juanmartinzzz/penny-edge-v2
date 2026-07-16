@@ -1,3 +1,7 @@
+/**
+ * Exchangewide Volume Gate (EVG) types and helpers.
+ * Product alias for exchange_scanners / warm_symbols filtering.
+ */
 import type { Quote } from "../market/types";
 
 export type ScannerRunStatus = "queued" | "running" | "ok" | "error";
@@ -54,6 +58,10 @@ export interface WarmSymbolRow {
   is_warm: number;
   last_seen_run_id: string | null;
   last_seen_at: string;
+  /** TAS snapshot JSON (full series); null until first analysis. */
+  analysis_json?: string | null;
+  analyzed_at?: string | null;
+  analysis_run_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -72,6 +80,7 @@ export function approxDailyValue(quote: Quote): number | null {
   return (vol3m * fiftyDay) / 90;
 }
 
+/** EVG volume gate: keep quotes that clear 10d avg volume + approx daily value. */
 export function passesWarmFilters(
   quote: Quote,
   filters: {

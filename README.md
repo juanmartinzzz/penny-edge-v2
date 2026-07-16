@@ -53,21 +53,35 @@ Provider-agnostic market service (Yahoo adapter today) with D1-backed cookie/cru
 | `GET` | `/market/auth/status` | Auth freshness (no secrets) |
 | `POST` | `/market/auth/refresh` | Force Yahoo cookie/crumb refresh |
 
-D1 database: `penny-edge-db` (tables `provider_auth`, `exchange_scanners`, `warm_symbols`, `scanner_runs`). Migrations: `npm run db:migrate:remote`.
+D1 database: `penny-edge-db` (tables `provider_auth`, `exchange_scanners`, `warm_symbols`, `scanner_runs`, `analysis_config`, `analysis_runs`). Migrations: `npm run db:migrate:remote`.
 
-### Scanners
+### Exchangewide Volume Gate (EVG)
 
-Per-exchange warm-symbol jobs (10d volume + approx daily value filters):
+Product name for per-exchange warm-symbol jobs (10d volume + approx daily value filters). API paths remain `/scanners`.
 
 | Method | Path | Notes |
 | --- | --- | --- |
 | `GET` | `/scanners` | List exchanges + config + warm counts |
 | `GET` | `/scanners/:id` | Detail + warm symbols |
 | `PATCH` | `/scanners/:id` | Update filters / interval / enabled |
-| `POST` | `/scanners/:id/run` | Queue a run now |
+| `POST` | `/scanners/:id/run` | Queue an EVG run now |
 | `GET` | `/scanners/runs/:runId` | Poll run progress |
 
-Runs process via Queue `penny-edge-scanner-jobs` in pages of 50, upserting matches after each page. Cron `0 * * * *` starts due enabled scanners (next run waits a full interval after enable).
+Runs process via Queue `penny-edge-scanner-jobs` in pages of 50, upserting matches after each page. Cron `0 * * * *` starts due enabled EVG scanners (next run waits a full interval after enable).
+
+### Trend Analysis for Symbols (TAS)
+
+Product name for scheduled deep price analysis of all EVG-gated (`is_warm`) symbols. Uses Yahoo chart (`/v8/finance/chart`) for daily + hourly series; stores the **full** analysis JSON on `warm_symbols.analysis_json`.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/analysis` | Config + warm/analyzed counts + active run |
+| `GET` | `/analysis/symbols` | All warm symbols with full `analysis` payload |
+| `PATCH` | `/analysis` | Update enabled / interval / lookbackDays / rollHours |
+| `POST` | `/analysis/run` | Queue a TAS run now |
+| `GET` | `/analysis/runs/:runId` | Poll run progress |
+
+Runs process via Queue `penny-edge-analysis-jobs` in small pages (default 5). Same hourly cron as EVG; `next_run_at` gates work. Defaults: lookback 21 days, roll window 3 hours, price-only rolling averages.
 
 ## Design notes
 

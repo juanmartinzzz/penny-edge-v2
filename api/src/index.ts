@@ -1,5 +1,16 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import {
+  getAnalysisOverview,
+  getAnalysisRunStatus,
+  getAnalysisSymbols,
+  patchAnalysisConfig,
+  processAnalysisJob,
+  processDueAnalysis,
+  startAnalysisRun,
+  type AnalysisEnv,
+} from "./analysis/service";
+import type { AnalysisJobMessage } from "./analysis/types";
 import { createMarketDataService } from "./market/service";
 import type { Interval, Range } from "./market/types";
 import { parseSymbolList } from "./market/yahoo/symbol";
@@ -15,9 +26,13 @@ import {
 } from "./scanners/service";
 import type { ScannerJobMessage } from "./scanners/types";
 
+type AppBindings = ScannerEnv & AnalysisEnv;
+
 type AppEnv = {
-  Bindings: ScannerEnv;
+  Bindings: AppBindings;
 };
+
+type QueueMessage = ScannerJobMessage | AnalysisJobMessage;
 
 const ALLOWED_ORIGINS = [
   "http://localhost:5292",
@@ -62,6 +77,10 @@ app.get("/", (c) =>
       "/scanners/:id",
       "/scanners/:id/run",
       "/scanners/runs/:runId",
+      "/analysis",
+      "/analysis/symbols",
+      "/analysis/run",
+      "/analysis/runs/:runId",
     ],
   }),
 );
@@ -187,6 +206,62 @@ app.post("/scanners/:id/run", async (c) => {
   }
 });
 
+app.get("/analysis", async (c) => {
+  try {
+    const overview = await getAnalysisOverview(c.env);
+    return c.json(overview);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : "Failed to load TAS" },
+      500,
+    );
+  }
+});
+
+app.get("/analysis/symbols", async (c) => {
+  const symbols = await getAnalysisSymbols(c.env);
+  return c.json({ count: symbols.length, symbols });
+});
+
+app.get("/analysis/runs/:runId", async (c) => {
+  const run = await getAnalysisRunStatus(c.env, c.req.param("runId"));
+  if (!run) return c.json({ error: "Run not found" }, 404);
+  return c.json({ run });
+});
+
+app.patch("/analysis", async (c) => {
+  try {
+    const body = await c.req.json<{
+      enabled?: boolean;
+      intervalHours?: number;
+      lookbackDays?: number;
+      rollHours?: number;
+      pageSize?: number;
+    }>();
+
+    const overview = await patchAnalysisConfig(c.env, body);
+    if (!overview) return c.json({ error: "Analysis config not found" }, 404);
+    return c.json(overview);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : "Failed to update TAS" },
+      400,
+    );
+  }
+});
+
+app.post("/analysis/run", async (c) => {
+  try {
+    const run = await startAnalysisRun(c.env, "manual");
+    return c.json({ run }, 202);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : "Failed to start TAS run" },
+      409,
+    );
+  }
+});
+
 app.onError((error, c) => {
   console.error("API error:", error);
   return c.json(
@@ -202,10 +277,17 @@ app.notFound((c) => c.json({ error: "Not found" }, 404));
 export default {
   fetch: app.fetch,
 
-  async queue(batch: MessageBatch<ScannerJobMessage>, env: ScannerEnv) {
+  async queue(batch: MessageBatch<QueueMessage>, env: AppBindings) {
     for (const message of batch.messages) {
       try {
-        await processScannerJob(env, message.body);
+        const body = message.body;
+        if (body.type === "scan_page") {
+          await processScannerJob(env, body);
+        } else if (body.type === "analysis_page") {
+          await processAnalysisJob(env, body);
+        } else {
+          console.error("Unknown queue message type", body);
+        }
         message.ack();
       } catch (error) {
         console.error("Queue message failed:", error);
@@ -214,11 +296,16 @@ export default {
     }
   },
 
-  async scheduled(_controller: ScheduledController, env: ScannerEnv, ctx: ExecutionContext) {
+  async scheduled(_controller: ScheduledController, env: AppBindings, ctx: ExecutionContext) {
     ctx.waitUntil(
-      processDueScanners(env).then((started) => {
-        console.log(`Cron started ${started} scanner run(s)`);
-      }),
+      Promise.all([
+        processDueScanners(env).then((started) => {
+          console.log(`Cron started ${started} EVG run(s)`);
+        }),
+        processDueAnalysis(env).then((started) => {
+          console.log(`Cron started ${started} TAS run(s)`);
+        }),
+      ]),
     );
   },
 };
