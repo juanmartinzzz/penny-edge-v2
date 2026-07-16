@@ -3,6 +3,11 @@ import { motion } from "framer-motion";
 import { ChevronDown, ChevronUp, Play, Save } from "lucide-react";
 import { Button } from "../components/interaction/Button";
 import { NumericInput } from "../components/interaction/NumericInput";
+import { AcronymLabel } from "../components/AcronymLabel";
+import {
+  TableExpandableRows,
+  type TableColumn,
+} from "../components/interaction/TableExpandableRows";
 import {
   getScanner,
   getScannerRun,
@@ -11,7 +16,10 @@ import {
   updateScanner,
   type Scanner,
   type ScannerRun,
+  type WarmSymbol,
 } from "../lib/scanners";
+import { PRODUCT_NAMES } from "../lib/productNames";
+import { formatDateTime } from "../lib/dates";
 import "./ScannersPage.css";
 
 function formatNumber(value: number | null | undefined): string {
@@ -19,10 +27,48 @@ function formatNumber(value: number | null | undefined): string {
   return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
 }
 
-function formatTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  return new Date(value).toLocaleString();
-}
+const warmSymbolColumns: TableColumn<WarmSymbol>[] = [
+  {
+    id: "symbol",
+    header: "Symbol",
+    accessor: (row) => row.symbol,
+  },
+  {
+    id: "price",
+    header: "Price",
+    align: "right",
+    accessor: (row) => row.price,
+    cell: (row) => formatNumber(row.price),
+  },
+  {
+    id: "changePercent",
+    header: "Chg %",
+    align: "right",
+    accessor: (row) => row.changePercent,
+    cell: (row) => formatNumber(row.changePercent),
+  },
+  {
+    id: "volume",
+    header: "Vol",
+    align: "right",
+    accessor: (row) => row.volume,
+    cell: (row) => formatNumber(row.volume),
+  },
+  {
+    id: "avgVolume10d",
+    header: "10d vol",
+    align: "right",
+    accessor: (row) => row.avgVolume10d,
+    cell: (row) => formatNumber(row.avgVolume10d),
+  },
+  {
+    id: "approxDailyValue",
+    header: "Approx value",
+    align: "right",
+    accessor: (row) => row.approxDailyValue,
+    cell: (row) => formatNumber(row.approxDailyValue),
+  },
+];
 
 function parseOptionalNumber(raw: string): number | null {
   const trimmed = raw.trim();
@@ -32,6 +78,25 @@ function parseOptionalNumber(raw: string): number | null {
     throw new Error("Enter a valid number");
   }
   return value;
+}
+
+function draftMatchesScanner(
+  scanner: Scanner,
+  draft: {
+    intervalHours: string;
+    minAvgVolume10d: string;
+    minApproxDailyValue: string;
+  },
+): boolean {
+  try {
+    return (
+      Number(draft.intervalHours) === scanner.intervalHours &&
+      parseOptionalNumber(draft.minAvgVolume10d) === scanner.minAvgVolume10d &&
+      parseOptionalNumber(draft.minApproxDailyValue) === scanner.minApproxDailyValue
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function ScannersPage() {
@@ -89,7 +154,7 @@ export function ScannersPage() {
         await refreshList();
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load scanners");
+          setError(err instanceof Error ? err.message : "Failed to load EVG");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -183,6 +248,18 @@ export function ScannersPage() {
           item.id === scanner.id ? { ...item, ...updated, symbols: item.symbols } : item,
         ),
       );
+      setDrafts((current) => ({
+        ...current,
+        [scanner.id]: {
+          intervalHours: String(updated.intervalHours),
+          minAvgVolume10d:
+            updated.minAvgVolume10d == null ? "" : String(updated.minAvgVolume10d),
+          minApproxDailyValue:
+            updated.minApproxDailyValue == null
+              ? ""
+              : String(updated.minApproxDailyValue),
+        },
+      }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save settings");
     } finally {
@@ -234,7 +311,7 @@ export function ScannersPage() {
       return scanner.lastRunError ?? "Last run failed";
     }
     if (scanner.lastRunAt) {
-      return `Last run ${formatTime(scanner.lastRunAt)} · ${scanner.lastRunMatched ?? 0} matched`;
+      return `Last run ${formatDateTime(scanner.lastRunAt)} · ${scanner.lastRunMatched ?? 0} matched`;
     }
     return "Never run";
   }
@@ -247,15 +324,19 @@ export function ScannersPage() {
       transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
     >
       <header className="scanners-header">
-        <h1>Scanners</h1>
+        <h1>
+          <AcronymLabel acronym="EVG" />
+        </h1>
         <p>
-          Per-exchange volume filters and scheduled jobs. Warm symbols are saved as each
-          queue batch completes.
+          Scheduled per-exchange volume gate. Symbols that clear the filters are
+          kept warm as each batch finishes.
         </p>
       </header>
 
       {error ? <p className="scanners-error">{error}</p> : null}
-      {loading ? <p className="scanner-status">Loading scanners…</p> : null}
+      {loading ? (
+        <p className="scanner-status">Loading {PRODUCT_NAMES.EVG}…</p>
+      ) : null}
 
       <div className="scanners-list">
         {scanners.map((scanner) => {
@@ -268,6 +349,7 @@ export function ScannersPage() {
           const running =
             scanner.activeRun?.status === "queued" ||
             scanner.activeRun?.status === "running";
+          const settingsDirty = !draftMatchesScanner(scanner, draft);
 
           return (
             <article key={scanner.id} className="scanner-card">
@@ -282,10 +364,11 @@ export function ScannersPage() {
                   </strong>
                   <div className="scanner-card-meta">
                     <span className={`scanner-pill${scanner.enabled ? " is-on" : ""}`}>
-                      Job {scanner.enabled ? "ON" : "OFF"}
+                      <AcronymLabel acronym="EVG" layout="inline" />{" "}
+                      {scanner.enabled ? "ON" : "OFF"}
                     </span>
                     <span className={`scanner-pill${running ? " is-running" : ""}`}>
-                      {scanner.warmCount} warm
+                      {scanner.warmCount} gated
                     </span>
                     <span>{runLabel(scanner.activeRun, scanner)}</span>
                   </div>
@@ -345,22 +428,22 @@ export function ScannersPage() {
                       disabled={busyId === scanner.id}
                       onClick={() => void handleToggle(scanner)}
                     >
-                      Turn job {scanner.enabled ? "OFF" : "ON"}
+                      Turn {PRODUCT_NAMES.EVG} {scanner.enabled ? "OFF" : "ON"}
                     </Button>
                     <Button
                       variant="ghost"
-                      disabled={busyId === scanner.id}
+                      disabled={busyId === scanner.id || !settingsDirty}
                       onClick={() => void handleSave(scanner)}
                     >
                       <Save size={16} strokeWidth={2.5} />
-                      Save
+                      Save settings
                     </Button>
                     <Button
                       disabled={busyId === scanner.id || running}
                       onClick={() => void handleRun(scanner)}
                     >
                       <Play size={16} strokeWidth={2.5} />
-                      {running ? "Running…" : "Run now"}
+                      {running ? "Running…" : `Run ${PRODUCT_NAMES.EVG}`}
                     </Button>
                     <p
                       className={`scanner-status${
@@ -368,7 +451,7 @@ export function ScannersPage() {
                       }`}
                     >
                       {scanner.enabled
-                        ? `Next run ${formatTime(scanner.nextRunAt)}`
+                        ? `Next run ${formatDateTime(scanner.nextRunAt)}`
                         : "Scheduler idle"}
                       {running
                         ? ` · ${scanner.activeRun?.status} ${scanner.activeRun?.scanned ?? 0}/${scanner.activeRun?.matched ?? 0}`
@@ -376,38 +459,20 @@ export function ScannersPage() {
                     </p>
                   </div>
 
-                  {scanner.symbols && scanner.symbols.length > 0 ? (
-                    <div className="scanner-table-wrap">
-                      <table className="scanner-table">
-                        <thead>
-                          <tr>
-                            <th>Symbol</th>
-                            <th>Price</th>
-                            <th>Chg %</th>
-                            <th>Vol</th>
-                            <th>10d vol</th>
-                            <th>Approx value</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {scanner.symbols.map((symbol) => (
-                            <tr key={symbol.id}>
-                              <td>{symbol.symbol}</td>
-                              <td>{formatNumber(symbol.price)}</td>
-                              <td>{formatNumber(symbol.changePercent)}</td>
-                              <td>{formatNumber(symbol.volume)}</td>
-                              <td>{formatNumber(symbol.avgVolume10d)}</td>
-                              <td>{formatNumber(symbol.approxDailyValue)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  ) : (
-                    <p className="scanner-empty">
-                      No warm symbols yet. Save filters and hit Run now.
-                    </p>
-                  )}
+                  <TableExpandableRows
+                    id="scanners.warm-symbols"
+                    rows={scanner.symbols ?? []}
+                    columns={warmSymbolColumns}
+                    getRowId={(row) => row.id}
+                    compact
+                    initialSort={[{ columnId: "volume", direction: "desc" }]}
+                    empty={
+                      <p className="scanner-empty">
+                        No gated symbols yet. Save filters and hit Run{" "}
+                        {PRODUCT_NAMES.EVG}.
+                      </p>
+                    }
+                  />
                 </div>
               ) : null}
             </article>

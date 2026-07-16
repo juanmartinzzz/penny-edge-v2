@@ -1,0 +1,46 @@
+.acronym-label {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.acronym-label.is-stack {
+  flex-direction: column;
+  gap: 0;
+  align-items: flex-start;
+}
+
+.acronym-label.is-inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.acronym-label-short {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.acronym-label-full {
+  font-family: var(--font-body);
+  font-size: 0.58rem;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.2;
+  opacity: 0.72;
+}
+
+.acronym-label.is-inline .acronym-label-full {
+  font-size: 0.68rem;
+}
+
+.acronym-label-short,
+.acronym-label-full {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}

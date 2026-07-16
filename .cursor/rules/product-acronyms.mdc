@@ -1,0 +1,30 @@
+---
+description: Product acronyms in UI must always show full names
+alwaysApply: true
+---
+
+# Product acronym labeling
+
+In user-facing UI, never show a product acronym alone.
+
+Known acronyms:
+
+| Acronym | Full name |
+| --- | --- |
+| EVG | Exchangewide Volume Gate |
+| TAS | Trend Analysis for Symbols |
+
+## Required pattern
+
+- **Bold acronym** + **full name in smaller type** below or beside it
+- Prefer the shared `AcronymLabel` component (`src/components/AcronymLabel.tsx`)
+- Use names from `src/lib/productNames.ts` — do not invent alternate expansions
+
+## Where it applies
+
+Nav, page headers, section titles, status pills, buttons, empty states, and overview tiles.
+
+## Exceptions
+
+- Code identifiers, API paths, DB tables, queue names, and comments may use the short form (optionally with expansion once)
+- Error/toast strings may use the acronym if space is tight, but prefer including the full name when practical

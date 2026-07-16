@@ -1,3 +1,7 @@
+/**
+ * Client for Exchangewide Volume Gate (EVG).
+ * Product name for the `/scanners` API — exchange scan + volume filter batch.
+ */
 import { apiFetch } from "./api";
 
 export type ScannerRunStatus = "queued" | "running" | "ok" | "error";
@@ -33,6 +37,9 @@ export type WarmSymbol = {
   approxDailyValue: number | null;
   currency: string | null;
   lastSeenAt: string;
+  analyzedAt?: string | null;
+  analysisRunId?: string | null;
+  analysis?: unknown;
 };
 
 export type Scanner = {

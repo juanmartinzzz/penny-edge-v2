@@ -1,13 +1,13 @@
 import { useState } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Sidebar, type NavId } from "./Sidebar";
-import { HomePage } from "../pages/HomePage";
-import { ScannersPage } from "../pages/ScannersPage";
+import { Sidebar, pathToNavId } from "./Sidebar";
 import "./AppShell.css";
 
 export function AppShell() {
   const [collapsed, setCollapsed] = useState(false);
-  const [active, setActive] = useState<NavId>("overview");
+  const { pathname } = useLocation();
+  const active = pathToNavId(pathname);
 
   return (
     <div className="app-shell">
@@ -20,9 +20,7 @@ export function AppShell() {
       >
         <Sidebar
           collapsed={collapsed}
-          active={active}
           onToggle={() => setCollapsed((value) => !value)}
-          onNavigate={setActive}
         />
       </motion.div>
 
@@ -31,7 +29,7 @@ export function AppShell() {
           <p className="app-topbar-title">{active}</p>
         </div>
         <div className="app-content">
-          {active === "scanners" ? <ScannersPage /> : <HomePage />}
+          <Outlet />
         </div>
       </main>
     </div>
