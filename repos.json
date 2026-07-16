@@ -1,0 +1,10 @@
+{
+  "repos": [
+    {
+      "name": "penny-edge",
+      "url": "https://github.com/juanmartinzzz/penny-edge.git",
+      "alias": "penny-edge-v1",
+      "extraContext": "Legacy Penny Edge app — primary reference for features and UX to rebuild on Cloudflare Workers + D1 in this v2 project. Browse under repos/penny-edge; do not npm install."
+    }
+  ]
+}

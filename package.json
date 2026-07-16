@@ -1,0 +1,36 @@
+{
+  "name": "penny-edge-v2",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "npm run build && vite preview",
+    "deploy": "npm run build && wrangler deploy",
+    "deploy:api": "wrangler deploy -c api/wrangler.jsonc",
+    "deploy:all": "npm run deploy:api && npm run deploy",
+    "cf-typegen": "wrangler types",
+    "cf-typegen:api": "wrangler types -c api/wrangler.jsonc --env-interface ApiEnv",
+    "repos:update": "for d in repos/*/; do [ -d \"$d/.git\" ] && git -C \"$d\" pull --ff-only; done"
+  },
+  "dependencies": {
+    "framer-motion": "^12.42.2",
+    "hono": "^4.12.30",
+    "lucide-react": "^1.24.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.45.0",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "oxlint": "^1.71.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1",
+    "wrangler": "^4.111.0"
+  }
+}
