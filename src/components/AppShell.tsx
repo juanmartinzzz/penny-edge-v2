@@ -31,7 +31,7 @@ export function AppShell() {
           <p className="app-topbar-title">{active}</p>
         </div>
         <div className="app-content">
-          {active === "scanners" ? <ScannersPage /> : <HomePage section={active} />}
+          {active === "scanners" ? <ScannersPage /> : <HomePage />}
         </div>
       </main>
     </div>

@@ -2,37 +2,13 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Database, Shield, Zap } from "lucide-react";
 import { Button } from "../components/interaction/Button";
-import type { NavId } from "../components/Sidebar";
 import { apiFetch } from "../lib/api";
 import "./HomePage.css";
-
-type HomePageProps = {
-  section: NavId;
-};
 
 type HealthResponse = {
   ok: boolean;
   service: string;
   time: string;
-};
-
-const COPY: Record<NavId, { title: string; lede: string }> = {
-  overview: {
-    title: "Bold edge ops, stripped to black and white.",
-    lede: "Penny Edge is a monochrome workspace for clear decisions. This demo page shows the layout, motion, and interaction basics.",
-  },
-  scanners: {
-    title: "Exchange scanners.",
-    lede: "Configure volume filters and scheduled warm-symbol jobs per exchange.",
-  },
-  insights: {
-    title: "Signals without the noise.",
-    lede: "Insight panels will land here later. For now, this is placeholder content to prove the shell and typography rhythm.",
-  },
-  settings: {
-    title: "Keep the system sharp.",
-    lede: "Settings will manage Workers, D1, and deploy preferences. The shell is ready; wire them when you are.",
-  },
 };
 
 const PANELS = [
@@ -49,12 +25,11 @@ const PANELS = [
   {
     icon: Shield,
     title: "Pure CSS",
-    body: "No Tailwind. Design tokens, fully rounded buttons, and bold Syne display type.",
+    body: "No Tailwind. Design tokens, fully rounded buttons, and bold Manrope display type.",
   },
 ];
 
-export function HomePage({ section }: HomePageProps) {
-  const { title, lede } = COPY[section];
+export function HomePage() {
   const [apiStatus, setApiStatus] = useState<string | null>(null);
   const [apiLoading, setApiLoading] = useState(false);
 
@@ -73,7 +48,6 @@ export function HomePage({ section }: HomePageProps) {
 
   return (
     <motion.section
-      key={section}
       className="home"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
@@ -81,8 +55,11 @@ export function HomePage({ section }: HomePageProps) {
     >
       <header className="home-hero">
         <p className="home-kicker">Penny Edge · demo</p>
-        <h1 className="home-title">{title}</h1>
-        <p className="home-lede">{lede}</p>
+        <h1 className="home-title">Bold edge ops, stripped to black and white.</h1>
+        <p className="home-lede">
+          Penny Edge is a monochrome workspace for clear decisions. This demo page shows the
+          layout, motion, and interaction basics.
+        </p>
         <div className="home-actions">
           <Button>
             Get started

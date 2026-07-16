@@ -1,15 +1,8 @@
-import {
-  LayoutDashboard,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Radar,
-  Settings,
-  Sparkles,
-} from "lucide-react";
+import { LayoutDashboard, PanelLeftClose, PanelLeftOpen, Radar } from "lucide-react";
 import { Button } from "./interaction/Button";
 import "./Sidebar.css";
 
-export type NavId = "overview" | "scanners" | "insights" | "settings";
+export type NavId = "overview" | "scanners";
 
 type SidebarProps = {
   collapsed: boolean;
@@ -21,8 +14,6 @@ type SidebarProps = {
 const NAV_ITEMS: { id: NavId; label: string; icon: typeof LayoutDashboard }[] = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
   { id: "scanners", label: "Scanners", icon: Radar },
-  { id: "insights", label: "Insights", icon: Sparkles },
-  { id: "settings", label: "Settings", icon: Settings },
 ];
 
 export function Sidebar({ collapsed, active, onToggle, onNavigate }: SidebarProps) {

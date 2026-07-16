@@ -71,4 +71,4 @@ Runs process via Queue `penny-edge-scanner-jobs` in pages of 50, upserting match
 
 ## Design notes
 
-Monochrome UI with bold Syne display type, IBM Plex Sans body, fully rounded buttons, and a collapsible left sidebar.
+Monochrome UI with bold Manrope display type, IBM Plex Sans body, fully rounded buttons, and a collapsible left sidebar.
