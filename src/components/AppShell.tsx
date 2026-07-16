@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { Sidebar, type NavId } from "./Sidebar";
 import { HomePage } from "../pages/HomePage";
+import { ScannersPage } from "../pages/ScannersPage";
 import "./AppShell.css";
 
 export function AppShell() {
@@ -30,7 +31,7 @@ export function AppShell() {
           <p className="app-topbar-title">{active}</p>
         </div>
         <div className="app-content">
-          <HomePage section={active} />
+          {active === "scanners" ? <ScannersPage /> : <HomePage section={active} />}
         </div>
       </main>
     </div>

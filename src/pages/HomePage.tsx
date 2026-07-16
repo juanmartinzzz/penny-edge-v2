@@ -21,6 +21,10 @@ const COPY: Record<NavId, { title: string; lede: string }> = {
     title: "Bold edge ops, stripped to black and white.",
     lede: "Penny Edge is a monochrome workspace for clear decisions. This demo page shows the layout, motion, and interaction basics.",
   },
+  scanners: {
+    title: "Exchange scanners.",
+    lede: "Configure volume filters and scheduled warm-symbol jobs per exchange.",
+  },
   insights: {
     title: "Signals without the noise.",
     lede: "Insight panels will land here later. For now, this is placeholder content to prove the shell and typography rhythm.",

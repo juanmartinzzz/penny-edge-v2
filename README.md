@@ -53,7 +53,21 @@ Provider-agnostic market service (Yahoo adapter today) with D1-backed cookie/cru
 | `GET` | `/market/auth/status` | Auth freshness (no secrets) |
 | `POST` | `/market/auth/refresh` | Force Yahoo cookie/crumb refresh |
 
-D1 database: `penny-edge-db` (table `provider_auth`). Migrations: `npm run db:migrate:remote`.
+D1 database: `penny-edge-db` (tables `provider_auth`, `exchange_scanners`, `warm_symbols`, `scanner_runs`). Migrations: `npm run db:migrate:remote`.
+
+### Scanners
+
+Per-exchange warm-symbol jobs (10d volume + approx daily value filters):
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/scanners` | List exchanges + config + warm counts |
+| `GET` | `/scanners/:id` | Detail + warm symbols |
+| `PATCH` | `/scanners/:id` | Update filters / interval / enabled |
+| `POST` | `/scanners/:id/run` | Queue a run now |
+| `GET` | `/scanners/runs/:runId` | Poll run progress |
+
+Runs process via Queue `penny-edge-scanner-jobs` in pages of 50, upserting matches after each page. Cron `0 * * * *` starts due enabled scanners (next run waits a full interval after enable).
 
 ## Design notes
 

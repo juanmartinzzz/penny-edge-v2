@@ -9,7 +9,11 @@
   },
   "vars": {
     "MARKET_DATA_PROVIDER": "yahoo",
-    "YAHOO_STALE_AFTER_MINUTES": "60"
+    "YAHOO_STALE_AFTER_MINUTES": "60",
+    "SCANNER_PAGE_SIZE": "50"
+  },
+  "triggers": {
+    "crons": ["0 * * * *"]
   },
   "d1_databases": [
     {
@@ -18,5 +22,21 @@
       "database_id": "141d9112-d24e-4c8c-9755-5ed870f94cae",
       "migrations_dir": "migrations"
     }
-  ]
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "SCANNER_QUEUE",
+        "queue": "penny-edge-scanner-jobs"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "penny-edge-scanner-jobs",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "max_batch_timeout": 5
+      }
+    ]
+  }
 }

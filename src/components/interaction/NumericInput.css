@@ -1,0 +1,38 @@
+.numeric-input {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.numeric-input-label {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.numeric-input input {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: var(--bg-muted);
+  color: var(--text);
+  padding: 0.7rem 1rem;
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.numeric-input input:focus {
+  outline: none;
+  border-color: var(--text-muted);
+}
+
+.numeric-input input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
