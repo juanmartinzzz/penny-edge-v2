@@ -13,6 +13,8 @@
     "deploy:all": "npm run deploy:api && npm run deploy",
     "cf-typegen": "wrangler types",
     "cf-typegen:api": "wrangler types -c api/wrangler.jsonc --env-interface ApiEnv",
+    "db:migrate:local": "wrangler d1 migrations apply penny-edge-db --local -c api/wrangler.jsonc",
+    "db:migrate:remote": "wrangler d1 migrations apply penny-edge-db --remote -c api/wrangler.jsonc",
     "repos:update": "for d in repos/*/; do [ -d \"$d/.git\" ] && git -C \"$d\" pull --ff-only; done"
   },
   "dependencies": {

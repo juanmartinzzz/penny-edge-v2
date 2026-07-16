@@ -41,6 +41,20 @@ Create a token at [API Tokens](https://dash.cloudflare.com/profile/api-tokens) w
 
 The API is a separate Worker in `api/`. Local frontend uses `VITE_API_URL` from `.env` and calls production directly (CORS allows localhost:5292).
 
+### Market data
+
+Provider-agnostic market service (Yahoo adapter today) with D1-backed cookie/crumb auth:
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/market/quotes?symbols=AAPL,SHOP.TO` | Batch quotes |
+| `GET` | `/market/chart/:symbol?exchange=TO&interval=1d&range=3mo` | OHLCV bars |
+| `POST` | `/market/screener` | Body: `{ "exchange": "TO", "limit": 25 }` |
+| `GET` | `/market/auth/status` | Auth freshness (no secrets) |
+| `POST` | `/market/auth/refresh` | Force Yahoo cookie/crumb refresh |
+
+D1 database: `penny-edge-db` (table `provider_auth`). Migrations: `npm run db:migrate:remote`.
+
 ## Design notes
 
 Monochrome UI with bold Syne display type, IBM Plex Sans body, fully rounded buttons, and a collapsible left sidebar.

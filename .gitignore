@@ -16,6 +16,7 @@ dist-ssr
 !.env.example
 .wrangler
 .dev.vars
+worker-configuration.d.ts
 
 # Local reference clones (see repos.json) — not committed
 repos/
