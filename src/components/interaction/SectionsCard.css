@@ -36,6 +36,10 @@
   color: var(--text-dim);
 }
 
+.sections-card-meta .is-error {
+  color: var(--danger);
+}
+
 .sections-card-sections {
   display: flex;
   flex-direction: column;

@@ -346,6 +346,18 @@ export function AnalysisPage() {
                   {overview.analyzedCount}/{overview.warmCount} analyzed
                 </span>
                 <span>{runLabel(overview.activeRun, overview)}</span>
+                <span
+                  className={
+                    overview.config.lastRunStatus === "error" ? "is-error" : undefined
+                  }
+                >
+                  {overview.config.enabled
+                    ? `Next run ${formatDateTime(overview.config.nextRunAt)}`
+                    : "Scheduler idle"}
+                  {running
+                    ? ` · ${overview.activeRun?.status} ${overview.activeRun?.scanned ?? 0}`
+                    : ""}
+                </span>
               </>
             }
             sections={formSections}
@@ -366,18 +378,6 @@ export function AnalysisPage() {
                   <Play size={16} strokeWidth={2.5} />
                   {running ? "Running…" : `Run ${PRODUCT_NAMES.TAS}`}
                 </Button>
-                <p
-                  className={`analysis-status${
-                    overview.config.lastRunStatus === "error" ? " is-error" : ""
-                  }`}
-                >
-                  {overview.config.enabled
-                    ? `Next run ${formatDateTime(overview.config.nextRunAt)}`
-                    : "Scheduler idle"}
-                  {running
-                    ? ` · ${overview.activeRun?.status} ${overview.activeRun?.scanned ?? 0}`
-                    : ""}
-                </p>
               </>
             }
           />
