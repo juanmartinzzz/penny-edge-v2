@@ -14,9 +14,12 @@ import {
   type TableColumn,
 } from "../components/interaction/TableExpandableRows";
 import {
+  COBUTA_TEMP_THRESHOLD,
   getTemperature,
   getTemperatureRun,
   getTemperatureSymbols,
+  isCobutaTemperature,
+  isHotTemperature,
   runTemperature,
   updateTemperature,
   TEMPERATURE_KNOBS,
@@ -68,9 +71,33 @@ function formatNumber(value: number | null | undefined): string {
 
 function tempTone(value: number | null | undefined): string {
   if (value == null) return "";
-  if (value >= 70) return " is-hot";
+  if (isHotTemperature(value)) return " is-hot";
   if (value >= 40) return " is-warm";
   return " is-cool";
+}
+
+function cobutaDividerAfter(
+  row: TemperatureSymbol,
+  nextRow: TemperatureSymbol | undefined,
+) {
+  if (!nextRow) return null;
+  if (!isCobutaTemperature(row.temperature)) return null;
+  if (isCobutaTemperature(nextRow.temperature)) return null;
+
+  return (
+    <div
+      className="temperature-cobuta"
+      role="separator"
+      aria-label={`${PRODUCT_NAMES.COBUTA} — temperatures ${COBUTA_TEMP_THRESHOLD}+ above`}
+    >
+      <span className="temperature-cobuta-shine" aria-hidden="true" />
+      <AcronymLabel
+        acronym="COBUTA"
+        layout="inline"
+        className="temperature-cobuta-label"
+      />
+    </div>
+  );
 }
 
 const symbolColumns: TableColumn<TemperatureSymbol>[] = [
@@ -523,6 +550,7 @@ export function TemperaturePage() {
               getRowId={(row) => row.id}
               compact
               initialSort={[{ columnId: "temperature", direction: "desc" }]}
+              rowDividerAfter={cobutaDividerAfter}
               empty={
                 <p className="temperature-empty">
                   No scores yet. Run <AcronymLabel acronym="TAS" layout="inline" />{" "}

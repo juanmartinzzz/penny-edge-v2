@@ -10,7 +10,7 @@ type AcronymLabelProps = {
 
 /**
  * Bold acronym with full product name in smaller type.
- * Required for EVG / TAS / HIS and any other product acronyms in UI.
+ * Required for EVG / TAS / HIS / COBUTA and any other product acronyms in UI.
  */
 export function AcronymLabel({
   acronym,

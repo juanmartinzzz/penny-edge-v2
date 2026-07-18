@@ -48,6 +48,11 @@ type TableExpandableRowsProps<T> = {
   initialSort?: SortEntry[];
   compact?: boolean;
   renderExpanded?: (row: T) => ReactNode;
+  /**
+   * Optional divider rendered after a data row (and its expanded panel).
+   * `nextRow` is the following row in the full sorted list (may be on the next page).
+   */
+  rowDividerAfter?: (row: T, nextRow: T | undefined) => ReactNode | null;
   empty?: ReactNode;
   className?: string;
 };
@@ -128,6 +133,7 @@ export function TableExpandableRows<T>({
   initialSort = [],
   compact = false,
   renderExpanded,
+  rowDividerAfter,
   empty = null,
   className = "",
 }: TableExpandableRowsProps<T>) {
@@ -311,9 +317,12 @@ export function TableExpandableRows<T>({
             </tr>
           </thead>
           <tbody>
-            {pageRows.map((row) => {
+            {pageRows.map((row, index) => {
               const rowId = getRowId(row);
               const isExpanded = expandedIds.has(rowId);
+              const nextRow = sortedRows[startIndex + index + 1];
+              const divider = rowDividerAfter?.(row, nextRow) ?? null;
+              const colSpan = columns.length + (expandable ? 1 : 0);
 
               return (
                 <Fragment key={rowId}>
@@ -348,7 +357,7 @@ export function TableExpandableRows<T>({
                   </tr>
                   {expandable && isExpanded && renderExpanded ? (
                     <tr className="ter-expanded-row">
-                      <td colSpan={columns.length + 1}>
+                      <td colSpan={colSpan}>
                         <motion.div
                           className="ter-expanded-panel"
                           initial={{ height: 0, opacity: 0 }}
@@ -358,6 +367,11 @@ export function TableExpandableRows<T>({
                           {renderExpanded(row)}
                         </motion.div>
                       </td>
+                    </tr>
+                  ) : null}
+                  {divider != null ? (
+                    <tr className="ter-row-divider">
+                      <td colSpan={colSpan}>{divider}</td>
                     </tr>
                   ) : null}
                 </Fragment>

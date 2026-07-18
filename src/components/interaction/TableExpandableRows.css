@@ -143,6 +143,12 @@
   background: color-mix(in srgb, var(--bg-muted) 70%, transparent);
 }
 
+.ter-row-divider td {
+  padding: 0;
+  white-space: normal;
+  border-bottom: 1px solid var(--border);
+}
+
 .ter-expanded-panel {
   overflow: hidden;
   padding: 0.85rem 1rem 1rem;

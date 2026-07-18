@@ -72,6 +72,23 @@ export type TemperatureSymbol = {
   analysis: unknown;
 };
 
+/** UI “hot” band — visually heated, not necessarily COBUTA. */
+export const HOT_TEMP_THRESHOLD = 70;
+
+/**
+ * Minimum temperature for the COBUTA (Consider Buying These Assets) group.
+ * Intentionally strict — rare, extreme crash-heat only.
+ */
+export const COBUTA_TEMP_THRESHOLD = 90;
+
+export function isHotTemperature(value: number | null | undefined): boolean {
+  return value != null && value >= HOT_TEMP_THRESHOLD;
+}
+
+export function isCobutaTemperature(value: number | null | undefined): boolean {
+  return value != null && value >= COBUTA_TEMP_THRESHOLD;
+}
+
 export type TemperatureConfig = {
   id: string;
   enabled: boolean;
