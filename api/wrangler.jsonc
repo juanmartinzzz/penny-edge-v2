@@ -11,7 +11,8 @@
     "MARKET_DATA_PROVIDER": "yahoo",
     "YAHOO_STALE_AFTER_MINUTES": "60",
     "SCANNER_PAGE_SIZE": "50",
-    "ANALYSIS_PAGE_SIZE": "5"
+    "ANALYSIS_PAGE_SIZE": "5",
+    "TEMPERATURE_PAGE_SIZE": "25"
   },
   "triggers": {
     "crons": ["0 * * * *"]
@@ -33,6 +34,10 @@
       {
         "binding": "ANALYSIS_QUEUE",
         "queue": "penny-edge-analysis-jobs"
+      },
+      {
+        "binding": "TEMPERATURE_QUEUE",
+        "queue": "penny-edge-temperature-jobs"
       }
     ],
     "consumers": [
@@ -44,6 +49,12 @@
       },
       {
         "queue": "penny-edge-analysis-jobs",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "max_batch_timeout": 5
+      },
+      {
+        "queue": "penny-edge-temperature-jobs",
         "max_batch_size": 1,
         "max_retries": 3,
         "max_batch_timeout": 5

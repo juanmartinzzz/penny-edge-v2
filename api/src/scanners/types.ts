@@ -62,6 +62,11 @@ export interface WarmSymbolRow {
   analysis_json?: string | null;
   analyzed_at?: string | null;
   analysis_run_id?: string | null;
+  /** HIS temperature 0–100; null until first score. */
+  temperature?: number | null;
+  temperature_components_json?: string | null;
+  temperature_at?: string | null;
+  temperature_run_id?: string | null;
   created_at: string;
   updated_at: string;
 }

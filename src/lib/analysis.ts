@@ -32,6 +32,9 @@ export type SymbolAnalysis = {
   };
   intraday: {
     sourceInterval: "1h";
+    /** Raw hourly closes from Yahoo. */
+    hourly: Array<{ t: number; c: number }>;
+    /** Roll-window buckets (homemade averages over `rollHours`). */
     points: Array<{ t: number; c: number; rollingAvgClose: number }>;
   };
   summary: {

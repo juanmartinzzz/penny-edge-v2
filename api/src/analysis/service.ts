@@ -333,7 +333,7 @@ export async function processAnalysisJob(
           lookbackDays: config.lookback_days,
           rollHours: config.roll_hours,
           daily: { bars: [], avgClose: null },
-          intraday: { sourceInterval: "1h", points: [] },
+          intraday: { sourceInterval: "1h", hourly: [], points: [] },
           summary: {
             lastClose: null,
             closeVsLookbackAvgPct: null,

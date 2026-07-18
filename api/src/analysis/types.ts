@@ -50,6 +50,12 @@ export interface AnalysisDailyBar {
   v?: number;
 }
 
+/** Raw hourly close from Yahoo (source series for impulse / temperature). */
+export interface AnalysisHourlyClose {
+  t: number;
+  c: number;
+}
+
 export interface AnalysisIntradayPoint {
   t: number;
   c: number;
@@ -66,6 +72,9 @@ export interface SymbolAnalysis {
   };
   intraday: {
     sourceInterval: "1h";
+    /** Raw hourly closes (full source series). */
+    hourly: AnalysisHourlyClose[];
+    /** Roll-window buckets (homemade averages over `rollHours`). */
     points: AnalysisIntradayPoint[];
   };
   summary: {
@@ -127,6 +136,11 @@ export function buildSymbolAnalysis(input: {
   const lastClose =
     dailyBars.length > 0 ? dailyBars[dailyBars.length - 1]!.c : null;
 
+  const hourly: AnalysisHourlyClose[] = input.hourlyBars
+    .slice()
+    .sort((a, b) => a.time - b.time)
+    .map((bar) => ({ t: bar.time, c: bar.close }));
+
   const bucketMs = rollHours * 60 * 60 * 1000;
   const buckets = new Map<number, number[]>();
 
@@ -161,7 +175,7 @@ export function buildSymbolAnalysis(input: {
     lookbackDays,
     rollHours,
     daily: { bars: dailyBars, avgClose },
-    intraday: { sourceInterval: "1h", points },
+    intraday: { sourceInterval: "1h", hourly, points },
     summary: {
       lastClose,
       closeVsLookbackAvgPct,
@@ -173,7 +187,15 @@ export function buildSymbolAnalysis(input: {
 export function parseAnalysisJson(raw: string | null): SymbolAnalysis | null {
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as SymbolAnalysis;
+    const parsed = JSON.parse(raw) as SymbolAnalysis;
+    if (!parsed.intraday) return parsed;
+    if (!Array.isArray(parsed.intraday.hourly)) {
+      parsed.intraday.hourly = [];
+    }
+    if (!Array.isArray(parsed.intraday.points)) {
+      parsed.intraday.points = [];
+    }
+    return parsed;
   } catch {
     return null;
   }

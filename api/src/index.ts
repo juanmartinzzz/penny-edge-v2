@@ -25,14 +25,25 @@ import {
   type ScannerEnv,
 } from "./scanners/service";
 import type { ScannerJobMessage } from "./scanners/types";
+import {
+  getTemperatureOverview,
+  getTemperatureRunStatus,
+  getTemperatureSymbols,
+  patchTemperatureConfig,
+  processDueTemperature,
+  processTemperatureJob,
+  startTemperatureRun,
+  type TemperatureEnv,
+} from "./temperature/service";
+import type { TemperatureJobMessage, TemperatureParams } from "./temperature/types";
 
-type AppBindings = ScannerEnv & AnalysisEnv;
+type AppBindings = ScannerEnv & AnalysisEnv & TemperatureEnv;
 
 type AppEnv = {
   Bindings: AppBindings;
 };
 
-type QueueMessage = ScannerJobMessage | AnalysisJobMessage;
+type QueueMessage = ScannerJobMessage | AnalysisJobMessage | TemperatureJobMessage;
 
 const ALLOWED_ORIGINS = [
   "http://localhost:5292",
@@ -81,6 +92,10 @@ app.get("/", (c) =>
       "/analysis/symbols",
       "/analysis/run",
       "/analysis/runs/:runId",
+      "/temperature",
+      "/temperature/symbols",
+      "/temperature/run",
+      "/temperature/runs/:runId",
     ],
   }),
 );
@@ -262,6 +277,61 @@ app.post("/analysis/run", async (c) => {
   }
 });
 
+app.get("/temperature", async (c) => {
+  try {
+    const overview = await getTemperatureOverview(c.env);
+    return c.json(overview);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : "Failed to load HIS" },
+      500,
+    );
+  }
+});
+
+app.get("/temperature/symbols", async (c) => {
+  const symbols = await getTemperatureSymbols(c.env);
+  return c.json({ count: symbols.length, symbols });
+});
+
+app.get("/temperature/runs/:runId", async (c) => {
+  const run = await getTemperatureRunStatus(c.env, c.req.param("runId"));
+  if (!run) return c.json({ error: "Run not found" }, 404);
+  return c.json({ run });
+});
+
+app.patch("/temperature", async (c) => {
+  try {
+    const body = await c.req.json<{
+      enabled?: boolean;
+      intervalHours?: number;
+      pageSize?: number;
+      params?: Partial<TemperatureParams>;
+    }>();
+
+    const overview = await patchTemperatureConfig(c.env, body);
+    if (!overview) return c.json({ error: "Temperature config not found" }, 404);
+    return c.json(overview);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : "Failed to update HIS" },
+      400,
+    );
+  }
+});
+
+app.post("/temperature/run", async (c) => {
+  try {
+    const run = await startTemperatureRun(c.env, "manual");
+    return c.json({ run }, 202);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : "Failed to start HIS run" },
+      409,
+    );
+  }
+});
+
 app.onError((error, c) => {
   console.error("API error:", error);
   return c.json(
@@ -285,6 +355,8 @@ export default {
           await processScannerJob(env, body);
         } else if (body.type === "analysis_page") {
           await processAnalysisJob(env, body);
+        } else if (body.type === "temperature_page") {
+          await processTemperatureJob(env, body);
         } else {
           console.error("Unknown queue message type", body);
         }
@@ -304,6 +376,9 @@ export default {
         }),
         processDueAnalysis(env).then((started) => {
           console.log(`Cron started ${started} TAS run(s)`);
+        }),
+        processDueTemperature(env).then((started) => {
+          console.log(`Cron started ${started} HIS run(s)`);
         }),
       ]),
     );
