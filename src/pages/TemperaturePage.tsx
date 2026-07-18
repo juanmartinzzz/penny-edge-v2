@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown, FlaskConical, Play, Save, Thermometer } from "lucide-react";
+import { Play, Save, Thermometer } from "lucide-react";
 import { Button } from "../components/interaction/Button";
 import { NumericInput } from "../components/interaction/NumericInput";
+import {
+  SectionsCard,
+  SectionsCardColumnLabel,
+  type SectionsCardSection,
+} from "../components/interaction/SectionsCard";
 import { AcronymLabel } from "../components/AcronymLabel";
 import {
   TableExpandableRows,
@@ -355,20 +360,78 @@ export function TemperaturePage() {
     );
   }
 
-  function renderGroups(
-    groups: typeof MAIN_KNOB_GROUPS,
-    sectionClassName = "temperature-section",
+  function knobsColumn(
+    group: (typeof MAIN_KNOB_GROUPS)[number],
+    opts?: { labeled?: boolean; fieldCols?: number },
   ) {
-    return groups.map((group) => (
-      <section key={`${sectionClassName}-${group.section}`} className={sectionClassName}>
-        <div className="temperature-section-head">
-          <h2>{group.meta.title}</h2>
-          <p>{group.meta.blurb}</p>
-        </div>
-        <div className="temperature-fields">{group.knobs.map(renderKnob)}</div>
-      </section>
-    ));
+    const fields = (
+      <div
+        className="sections-card-fields"
+        style={{
+          ["--sections-card-field-cols" as string]: String(opts?.fieldCols ?? 1),
+        }}
+      >
+        {group.knobs.map(renderKnob)}
+      </div>
+    );
+
+    if (!opts?.labeled) return fields;
+
+    return (
+      <div>
+        <SectionsCardColumnLabel
+          title={group.meta.title}
+          description={group.meta.blurb}
+        />
+        {fields}
+      </div>
+    );
   }
+
+  const scheduleGroup = MAIN_KNOB_GROUPS.find((g) => g.section === "schedule");
+  const blendGroup = MAIN_KNOB_GROUPS.find((g) => g.section === "blend");
+  const windowsGroup = MAIN_KNOB_GROUPS.find((g) => g.section === "windows");
+
+  const formSections: SectionsCardSection[] = [];
+
+  if (scheduleGroup && blendGroup) {
+    formSections.push({
+      id: "core",
+      columns: [
+        knobsColumn(scheduleGroup, { labeled: true }),
+        knobsColumn(blendGroup, { labeled: true }),
+      ],
+    });
+  }
+
+  if (windowsGroup) {
+    formSections.push({
+      id: "windows",
+      title: windowsGroup.meta.title,
+      description: windowsGroup.meta.blurb,
+      columns: windowsGroup.knobs.map((knob) => renderKnob(knob)),
+    });
+  }
+
+  formSections.push({
+    id: "advanced",
+    title: "Advanced recipe",
+    description: "Autopilot defaults · deep dive if you want",
+    collapsible: true,
+    defaultCollapsed: true,
+    columns: [
+      <div key="advanced-stack" className="sections-card-stack">
+        {ADVANCED_KNOB_GROUPS.map((group) => (
+          <div key={group.section} className="sections-card-stack-block">
+            {knobsColumn(group, {
+              labeled: true,
+              fieldCols: Math.min(group.knobs.length, 2),
+            })}
+          </div>
+        ))}
+      </div>,
+    ],
+  });
 
   const running =
     overview?.activeRun?.status === "queued" ||
@@ -399,52 +462,24 @@ export function TemperaturePage() {
         <p className="temperature-status">Loading {PRODUCT_NAMES.HIS}…</p>
       ) : (
         <>
-          <article className="temperature-card">
-            <div className="temperature-card-header">
-              <div className="temperature-card-title">
-                <AcronymLabel acronym="HIS" />
-                <div className="temperature-card-meta">
-                  <span
-                    className={`temperature-pill${overview.config.enabled ? " is-on" : ""}`}
-                  >
-                    {overview.config.enabled ? "ON" : "OFF"}
-                  </span>
-                  <span className={`temperature-pill${running ? " is-running" : ""}`}>
-                    {overview.scoredCount}/{overview.analyzedCount} scored
-                  </span>
-                  <span>{runLabel(overview.activeRun, overview)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="temperature-card-body">
-              {renderGroups(MAIN_KNOB_GROUPS)}
-
-              <details className="temperature-advanced">
-                <summary className="temperature-advanced-summary">
-                  <span className="temperature-advanced-title">
-                    <FlaskConical size={18} strokeWidth={2.25} aria-hidden />
-                    Advanced recipe
-                  </span>
-                  <span className="temperature-advanced-hint">
-                    Autopilot defaults · deep dive if you want
-                  </span>
-                  <ChevronDown
-                    className="temperature-advanced-chevron"
-                    size={18}
-                    strokeWidth={2.25}
-                    aria-hidden
-                  />
-                </summary>
-                <div className="temperature-advanced-body">
-                  {renderGroups(
-                    ADVANCED_KNOB_GROUPS,
-                    "temperature-section is-advanced",
-                  )}
-                </div>
-              </details>
-
-              <div className="temperature-actions">
+          <SectionsCard
+            id="his.settings"
+            meta={
+              <>
+                <span
+                  className={`temperature-pill${overview.config.enabled ? " is-on" : ""}`}
+                >
+                  {overview.config.enabled ? "ON" : "OFF"}
+                </span>
+                <span className={`temperature-pill${running ? " is-running" : ""}`}>
+                  {overview.scoredCount}/{overview.analyzedCount} scored
+                </span>
+                <span>{runLabel(overview.activeRun, overview)}</span>
+              </>
+            }
+            sections={formSections}
+            footer={
+              <>
                 <Button variant="ghost" disabled={busy} onClick={() => void handleToggle()}>
                   Turn {PRODUCT_NAMES.HIS} {overview.config.enabled ? "OFF" : "ON"}
                 </Button>
@@ -472,9 +507,9 @@ export function TemperaturePage() {
                     ? ` · ${overview.activeRun?.status} ${overview.activeRun?.scanned ?? 0}`
                     : ""}
                 </p>
-              </div>
-            </div>
-          </article>
+              </>
+            }
+          />
 
           <div className="temperature-symbols">
             <div className="temperature-symbols-head">

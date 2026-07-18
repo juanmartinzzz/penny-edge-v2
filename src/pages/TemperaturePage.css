@@ -27,48 +27,8 @@
   max-width: 28ch;
 }
 
-.temperature-card-title .acronym-label-short {
-  font-size: 1.15rem;
-}
-
-.temperature-card-title .acronym-label-full {
-  white-space: normal;
-  max-width: 24ch;
-}
-
 .temperature-header p {
   max-width: 56ch;
-}
-
-.temperature-card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--bg-elevated) 85%, transparent);
-  overflow: hidden;
-}
-
-.temperature-card-header {
-  padding: 1rem 1.15rem;
-}
-
-.temperature-card-title {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.temperature-card-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 0.85rem;
-  font-size: 0.8rem;
-  color: var(--text-dim);
-}
-
-.temperature-card-meta span {
-  font-family: var(--font-display);
-  font-weight: 600;
-  letter-spacing: -0.01em;
 }
 
 .temperature-pill {
@@ -94,116 +54,6 @@
 
 .temperature-pill.is-running {
   border-color: var(--text-muted);
-}
-
-.temperature-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 1.35rem;
-  padding: 0 1.15rem 1.25rem;
-  border-top: 1px solid var(--border);
-}
-
-.temperature-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border);
-}
-
-.temperature-section:first-of-type {
-  border-top: none;
-  padding-top: 1.1rem;
-}
-
-.temperature-section-head h2 {
-  font-family: var(--font-display);
-  font-size: 0.95rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.temperature-section-head p {
-  margin-top: 0.2rem;
-  font-size: 0.82rem;
-  color: var(--text-dim);
-  max-width: 52ch;
-}
-
-.temperature-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1rem 0.85rem;
-}
-
-.temperature-advanced {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--bg-muted) 70%, transparent);
-  overflow: hidden;
-}
-
-.temperature-advanced-summary {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.15rem 0.75rem;
-  align-items: center;
-  padding: 0.9rem 1rem;
-  cursor: pointer;
-  list-style: none;
-  user-select: none;
-}
-
-.temperature-advanced-summary::-webkit-details-marker {
-  display: none;
-}
-
-.temperature-advanced-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-family: var(--font-display);
-  font-size: 0.95rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.temperature-advanced-hint {
-  grid-column: 1;
-  font-size: 0.78rem;
-  color: var(--text-dim);
-}
-
-.temperature-advanced-chevron {
-  grid-row: 1 / span 2;
-  grid-column: 2;
-  color: var(--text-muted);
-  transition: transform 0.2s ease;
-}
-
-.temperature-advanced[open] .temperature-advanced-chevron {
-  transform: rotate(180deg);
-}
-
-.temperature-advanced-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0 1rem 1rem;
-  border-top: 1px solid var(--border);
-}
-
-.temperature-section.is-advanced:first-of-type {
-  padding-top: 1rem;
-}
-
-.temperature-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  align-items: center;
-  padding-top: 0.35rem;
 }
 
 .temperature-status {
@@ -288,10 +138,4 @@
   line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-@media (max-width: 860px) {
-  .temperature-fields {
-    grid-template-columns: 1fr;
-  }
 }

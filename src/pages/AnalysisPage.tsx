@@ -3,6 +3,10 @@ import { motion } from "framer-motion";
 import { Play, Save } from "lucide-react";
 import { Button } from "../components/interaction/Button";
 import { NumericInput } from "../components/interaction/NumericInput";
+import {
+  SectionsCard,
+  type SectionsCardSection,
+} from "../components/interaction/SectionsCard";
 import { AcronymLabel } from "../components/AcronymLabel";
 import {
   TableExpandableRows,
@@ -254,6 +258,59 @@ export function AnalysisPage() {
     overview?.activeRun?.status === "running";
   const settingsDirty = overview ? !draftMatches(overview, draft) : false;
 
+  const formSections: SectionsCardSection[] = [
+    {
+      id: "windows",
+      title: "Price windows",
+      description:
+        "Daily lookback, hourly roll buckets, and how often TAS re-runs.",
+      columns: [
+        <NumericInput
+          key="lookbackDays"
+          label="Lookback days"
+          help="How many trading days of daily bars to keep. Bigger = longer history vs the lookback average."
+          min={1}
+          step={1}
+          value={draft.lookbackDays}
+          onChange={(event) =>
+            setDraft((current) => ({
+              ...current,
+              lookbackDays: event.target.value,
+            }))
+          }
+        />,
+        <NumericInput
+          key="rollHours"
+          label="Roll hours"
+          help="Width of each homemade hourly bucket. 3 means each point averages about three hours of closes."
+          min={1}
+          step={1}
+          value={draft.rollHours}
+          onChange={(event) =>
+            setDraft((current) => ({
+              ...current,
+              rollHours: event.target.value,
+            }))
+          }
+        />,
+        <NumericInput
+          key="intervalHours"
+          label="Interval (hours)"
+          help="Hours between automatic TAS runs. Doesn’t change the math — only when we refresh the series."
+          min={1}
+          step={1}
+          value={draft.intervalHours}
+          onChange={(event) =>
+            setDraft((current) => ({
+              ...current,
+              intervalHours: event.target.value,
+            }))
+          }
+        />,
+      ],
+    },
+  ];
+
   return (
     <motion.section
       className="analysis"
@@ -278,63 +335,22 @@ export function AnalysisPage() {
         <p className="analysis-status">Loading {PRODUCT_NAMES.TAS}…</p>
       ) : (
         <>
-          <article className="analysis-card">
-            <div className="analysis-card-header">
-              <div className="analysis-card-title">
-                <AcronymLabel acronym="TAS" />
-                <div className="analysis-card-meta">
-                  <span className={`analysis-pill${overview.config.enabled ? " is-on" : ""}`}>
-                    {overview.config.enabled ? "ON" : "OFF"}
-                  </span>
-                  <span className={`analysis-pill${running ? " is-running" : ""}`}>
-                    {overview.analyzedCount}/{overview.warmCount} analyzed
-                  </span>
-                  <span>{runLabel(overview.activeRun, overview)}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="analysis-card-body">
-              <div className="analysis-fields">
-                <NumericInput
-                  label="Lookback days"
-                  min={1}
-                  step={1}
-                  value={draft.lookbackDays}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      lookbackDays: event.target.value,
-                    }))
-                  }
-                />
-                <NumericInput
-                  label="Roll hours"
-                  min={1}
-                  step={1}
-                  value={draft.rollHours}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      rollHours: event.target.value,
-                    }))
-                  }
-                />
-                <NumericInput
-                  label="Interval (hours)"
-                  min={1}
-                  step={1}
-                  value={draft.intervalHours}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      intervalHours: event.target.value,
-                    }))
-                  }
-                />
-              </div>
-
-              <div className="analysis-actions">
+          <SectionsCard
+            id="tas.settings"
+            meta={
+              <>
+                <span className={`analysis-pill${overview.config.enabled ? " is-on" : ""}`}>
+                  {overview.config.enabled ? "ON" : "OFF"}
+                </span>
+                <span className={`analysis-pill${running ? " is-running" : ""}`}>
+                  {overview.analyzedCount}/{overview.warmCount} analyzed
+                </span>
+                <span>{runLabel(overview.activeRun, overview)}</span>
+              </>
+            }
+            sections={formSections}
+            footer={
+              <>
                 <Button variant="ghost" disabled={busy} onClick={() => void handleToggle()}>
                   Turn {PRODUCT_NAMES.TAS} {overview.config.enabled ? "OFF" : "ON"}
                 </Button>
@@ -362,9 +378,9 @@ export function AnalysisPage() {
                     ? ` · ${overview.activeRun?.status} ${overview.activeRun?.scanned ?? 0}`
                     : ""}
                 </p>
-              </div>
-            </div>
-          </article>
+              </>
+            }
+          />
 
           <div className="analysis-symbols">
             <TableExpandableRows
