@@ -267,8 +267,9 @@ export function AnalysisPage() {
         </h1>
         <p>
           Walks every <AcronymLabel acronym="EVG" layout="inline" />-gated symbol
-          on a schedule, pulls Yahoo daily and hourly charts, and stores full
-          price series for charting.
+          on a schedule, pulls Yahoo daily + hourly charts, and stores both the
+          raw hourly closes and homemade roll-window averages for charting and{" "}
+          <AcronymLabel acronym="HIS" layout="inline" />.
         </p>
       </header>
 

@@ -1,4 +1,5 @@
-:root {
+:root,
+[data-theme="dark"] {
   --bg: #0a0a0a;
   --bg-elevated: #141414;
   --bg-muted: #1c1c1c;
@@ -9,6 +10,7 @@
   --text-dim: #5c5c5c;
   --accent: #ffffff;
   --accent-contrast: #0a0a0a;
+  --accent-hover: #e8e8e8;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-full: 9999px;
@@ -17,7 +19,35 @@
   --font-display: "Manrope", sans-serif;
   --font-body: "IBM Plex Sans", sans-serif;
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  --danger: #ffb4b4;
+  --success: #b8d8b8;
+  --warning: #e6c35c;
+  --heat: #ff8f70;
+  --bg-glow-1: #222222;
+  --bg-glow-2: #1a1a1a;
   color-scheme: dark;
+}
+
+[data-theme="light"] {
+  --bg: #f2f1ee;
+  --bg-elevated: #ffffff;
+  --bg-muted: #e8e7e3;
+  --border: #d8d6d0;
+  --border-strong: #bdbbb4;
+  --text: #141413;
+  --text-muted: #5c5b56;
+  --text-dim: #8a8882;
+  --accent: #141413;
+  --accent-contrast: #f2f1ee;
+  --accent-hover: #2a2a28;
+  --shadow: 0 12px 36px rgba(20, 20, 19, 0.08);
+  --danger: #c23b3b;
+  --success: #2f6b45;
+  --warning: #9a7420;
+  --heat: #c45a38;
+  --bg-glow-1: #ddd9d0;
+  --bg-glow-2: #e6e2da;
+  color-scheme: light;
 }
 
 *,
@@ -36,12 +66,15 @@ body,
 body {
   font-family: var(--font-body);
   background:
-    radial-gradient(ellipse 80% 50% at 10% -10%, #222 0%, transparent 55%),
-    radial-gradient(ellipse 60% 40% at 100% 0%, #1a1a1a 0%, transparent 50%),
+    radial-gradient(ellipse 80% 50% at 10% -10%, var(--bg-glow-1) 0%, transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, var(--bg-glow-2) 0%, transparent 50%),
     var(--bg);
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  transition:
+    background-color 180ms ease,
+    color 180ms ease;
 }
 
 button,

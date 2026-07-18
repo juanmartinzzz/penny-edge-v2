@@ -21,7 +21,7 @@
 }
 
 .home-error {
-  color: #ffb4b4;
+  color: var(--danger);
   font-family: var(--font-display);
   font-weight: 600;
 }
@@ -35,7 +35,7 @@
 
 .home-pipeline {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.85rem;
 }
 
@@ -81,7 +81,7 @@
 }
 
 .home-pill.tone-ok {
-  border-color: color-mix(in srgb, #9d9 45%, var(--border-strong));
+  border-color: color-mix(in srgb, var(--success) 45%, var(--border-strong));
 }
 
 .home-pill.tone-run {
@@ -89,8 +89,8 @@
 }
 
 .home-pill.tone-error {
-  border-color: color-mix(in srgb, #f88 55%, var(--border-strong));
-  color: #ffb4b4;
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border-strong));
+  color: var(--danger);
 }
 
 .home-pill.tone-idle {
@@ -212,11 +212,11 @@
 }
 
 .home-run-status.tone-ok {
-  color: #b8d8b8;
+  color: var(--success);
 }
 
 .home-run-status.tone-error {
-  color: #ffb4b4;
+  color: var(--danger);
 }
 
 .home-run-status.tone-run {
@@ -305,15 +305,15 @@
 }
 
 .home-mover-list strong.is-up {
-  color: #b8d8b8;
+  color: var(--success);
 }
 
 .home-mover-list strong.is-down {
-  color: #ffb4b4;
+  color: var(--danger);
 }
 
 .home-mover-list strong.is-error {
-  color: #ffb4b4;
+  color: var(--danger);
   font-size: 0.72rem;
   font-weight: 600;
   text-align: right;

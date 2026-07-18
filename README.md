@@ -53,7 +53,7 @@ Provider-agnostic market service (Yahoo adapter today) with D1-backed cookie/cru
 | `GET` | `/market/auth/status` | Auth freshness (no secrets) |
 | `POST` | `/market/auth/refresh` | Force Yahoo cookie/crumb refresh |
 
-D1 database: `penny-edge-db` (tables `provider_auth`, `exchange_scanners`, `warm_symbols`, `scanner_runs`, `analysis_config`, `analysis_runs`). Migrations: `npm run db:migrate:remote`.
+D1 database: `penny-edge-db` (tables `provider_auth`, `exchange_scanners`, `warm_symbols`, `scanner_runs`, `analysis_config`, `analysis_runs`, `temperature_config`, `temperature_runs`). Migrations: `npm run db:migrate:remote`.
 
 ### Exchangewide Volume Gate (EVG)
 
@@ -71,7 +71,7 @@ Runs process via Queue `penny-edge-scanner-jobs` in pages of 50, upserting match
 
 ### Trend Analysis for Symbols (TAS)
 
-Product name for scheduled deep price analysis of all EVG-gated (`is_warm`) symbols. Uses Yahoo chart (`/v8/finance/chart`) for daily + hourly series; stores the **full** analysis JSON on `warm_symbols.analysis_json`.
+Product name for scheduled deep price analysis of all EVG-gated (`is_warm`) symbols. Uses Yahoo chart (`/v8/finance/chart`) for daily + hourly series; stores the **full** analysis JSON on `warm_symbols.analysis_json`, including **raw hourly closes** (`intraday.hourly`) and homemade roll-window averages (`intraday.points`).
 
 | Method | Path | Notes |
 | --- | --- | --- |
@@ -82,6 +82,20 @@ Product name for scheduled deep price analysis of all EVG-gated (`is_warm`) symb
 | `GET` | `/analysis/runs/:runId` | Poll run progress |
 
 Runs process via Queue `penny-edge-analysis-jobs` in small pages (default 5). Same hourly cron as EVG; `next_run_at` gates work. Defaults: lookback 21 days, roll window 3 hours, price-only rolling averages.
+
+### Heat and Interest Scale (HIS)
+
+Product name for scheduled crash-heat scoring (0–100) of TAS snapshots. No Yahoo re-fetch — reads `analysis_json` hourly closes and writes `temperature` + component breakdown on `warm_symbols`.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/temperature` | Config + params + scored/analyzed counts + active run |
+| `GET` | `/temperature/symbols` | Warm symbols with temperature + components |
+| `PATCH` | `/temperature` | Update enabled / intervalHours / scoring params |
+| `POST` | `/temperature/run` | Queue a HIS run now |
+| `GET` | `/temperature/runs/:runId` | Poll run progress |
+
+Runs process via Queue `penny-edge-temperature-jobs`. Same hourly cron; `next_run_at` gates work. High scores = deep, sharp, recent drops; flat/rising names are dampened.
 
 ## Design notes
 

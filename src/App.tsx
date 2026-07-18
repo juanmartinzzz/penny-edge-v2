@@ -3,6 +3,7 @@ import { AppShell } from "./components/AppShell";
 import { AnalysisPage } from "./pages/AnalysisPage";
 import { HomePage } from "./pages/HomePage";
 import { ScannersPage } from "./pages/ScannersPage";
+import { TemperaturePage } from "./pages/TemperaturePage";
 
 export default function App() {
   return (
@@ -12,6 +13,7 @@ export default function App() {
           <Route index element={<HomePage />} />
           <Route path="scanners" element={<ScannersPage />} />
           <Route path="analysis" element={<AnalysisPage />} />
+          <Route path="temperature" element={<TemperaturePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

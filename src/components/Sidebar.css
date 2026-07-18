@@ -21,28 +21,24 @@
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
   min-width: 0;
   overflow: hidden;
 }
 
 .sidebar-brand-mark {
-  display: grid;
-  place-items: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  display: none;
+  width: 1.65rem;
+  height: 1.65rem;
   flex-shrink: 0;
-  border-radius: var(--radius-sm);
-  background: var(--accent);
-  color: var(--accent-contrast);
+  color: var(--text);
 }
 
-.sidebar-brand-text {
-  font-family: var(--font-display);
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: -0.04em;
-  white-space: nowrap;
+.sidebar-brand-wordmark {
+  display: block;
+  height: 1.15rem;
+  width: auto;
+  color: var(--text);
+  flex-shrink: 0;
 }
 
 .sidebar-nav {
@@ -87,7 +83,7 @@
   border-color: color-mix(in srgb, var(--border-strong) 70%, transparent);
   color: var(--text);
   box-shadow:
-    inset 0 1px 0 color-mix(in srgb, #fff 8%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--text) 8%, transparent),
     0 0 0 1px color-mix(in srgb, var(--border) 40%, transparent);
   backdrop-filter: blur(10px) saturate(1.15);
 }
@@ -113,24 +109,37 @@
 }
 
 .sidebar-footer {
-  padding: 1rem 0.85rem 1.15rem;
+  display: flex;
+  padding: 0.85rem 0.75rem 1.15rem;
   border-top: 1px solid var(--border);
 }
 
-.sidebar-footer-meta {
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
+.sidebar-theme-toggle {
+  width: 100%;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  font-size: 0.85rem;
 }
 
 .sidebar.is-collapsed .sidebar-header {
+  flex-direction: column;
   justify-content: center;
-  padding-inline: 0.75rem;
+  gap: 0.55rem;
+  padding: 0.85rem 0.75rem;
 }
 
-.sidebar.is-collapsed .sidebar-brand,
-.sidebar.is-collapsed .sidebar-footer-meta,
+.sidebar.is-collapsed .sidebar-brand {
+  justify-content: center;
+}
+
+.sidebar.is-collapsed .sidebar-brand-mark {
+  display: block;
+}
+
+.sidebar.is-collapsed .sidebar-brand-wordmark {
+  display: none;
+}
+
 .sidebar.is-collapsed .sidebar-link-label {
   display: none;
 }
@@ -138,4 +147,15 @@
 .sidebar.is-collapsed .sidebar-link {
   justify-content: center;
   padding-inline: 0.65rem;
+}
+
+.sidebar.is-collapsed .sidebar-footer {
+  justify-content: center;
+  padding-inline: 0.75rem;
+}
+
+.sidebar.is-collapsed .sidebar-theme-toggle {
+  width: 2.5rem;
+  justify-content: center;
+  padding-inline: 0;
 }

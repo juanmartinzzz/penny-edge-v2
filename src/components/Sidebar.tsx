@@ -2,17 +2,22 @@ import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
   LineChart,
+  Moon,
   PanelLeftClose,
   PanelLeftOpen,
   Radar,
+  Sun,
+  Thermometer,
 } from "lucide-react";
 import { AcronymLabel } from "./AcronymLabel";
 import { Button } from "./interaction/Button";
+import { PennyEdgeMark, PennyEdgeWordmark } from "./PennyEdgeLogo";
 import type { ProductAcronym } from "../lib/productNames";
 import { PRODUCT_NAMES } from "../lib/productNames";
+import { useTheme } from "../lib/theme";
 import "./Sidebar.css";
 
-export type NavId = "overview" | "scanners" | "analysis";
+export type NavId = "overview" | "scanners" | "analysis" | "temperature";
 
 type SidebarProps = {
   collapsed: boolean;
@@ -29,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "overview", label: "Overview", path: "/", icon: LayoutDashboard },
   { id: "scanners", acronym: "EVG", path: "/scanners", icon: Radar },
   { id: "analysis", acronym: "TAS", path: "/analysis", icon: LineChart },
+  { id: "temperature", acronym: "HIS", path: "/temperature", icon: Thermometer },
 ];
 
 export function pathToNavId(pathname: string): NavId {
@@ -38,18 +44,21 @@ export function pathToNavId(pathname: string): NavId {
   if (pathname === "/analysis" || pathname.startsWith("/analysis/")) {
     return "analysis";
   }
+  if (pathname === "/temperature" || pathname.startsWith("/temperature/")) {
+    return "temperature";
+  }
   return "overview";
 }
 
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <aside className={`sidebar${collapsed ? " is-collapsed" : ""}`}>
       <div className="sidebar-header">
         <div className="sidebar-brand">
-          <span className="sidebar-brand-mark" aria-hidden>
-            P
-          </span>
-          <span className="sidebar-brand-text">Penny Edge</span>
+          <PennyEdgeMark className="sidebar-brand-mark" />
+          <PennyEdgeWordmark className="sidebar-brand-wordmark" />
         </div>
         <Button
           variant="ghost"
@@ -90,7 +99,25 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </nav>
 
       <div className="sidebar-footer">
-        <p className="sidebar-footer-meta">Workers · D1 · Queues</p>
+        <Button
+          variant="ghost"
+          className="sidebar-theme-toggle"
+          iconOnly={collapsed}
+          aria-label={
+            theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+          }
+          title={theme === "dark" ? "Light mode" : "Dark mode"}
+          onClick={toggleTheme}
+        >
+          {theme === "dark" ? (
+            <Sun size={18} strokeWidth={2.25} />
+          ) : (
+            <Moon size={18} strokeWidth={2.25} />
+          )}
+          {!collapsed ? (
+            <span>{theme === "dark" ? "Light mode" : "Dark mode"}</span>
+          ) : null}
+        </Button>
       </div>
     </aside>
   );

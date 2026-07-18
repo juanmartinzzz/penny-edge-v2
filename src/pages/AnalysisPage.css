@@ -133,7 +133,7 @@
 }
 
 .analysis-status.is-error {
-  color: #ffb4b4;
+  color: var(--danger);
 }
 
 .analysis-empty {
@@ -143,7 +143,7 @@
 }
 
 .analysis-error {
-  color: #ffb4b4;
+  color: var(--danger);
   font-family: var(--font-display);
   font-weight: 600;
 }

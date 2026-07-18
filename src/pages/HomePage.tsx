@@ -11,6 +11,7 @@ import {
   type AnalysisOverview,
   type AnalysisSymbol,
 } from "../lib/analysis";
+import { getTemperature, type TemperatureOverview } from "../lib/temperature";
 import { listScanners, type Scanner } from "../lib/scanners";
 import { PRODUCT_NAMES } from "../lib/productNames";
 import { formatDateTime } from "../lib/dates";
@@ -26,6 +27,7 @@ type AuthStatus = {
 type OverviewBundle = {
   scanners: Scanner[];
   analysis: AnalysisOverview;
+  temperature: TemperatureOverview;
   symbols: AnalysisSymbol[];
   auth: AuthStatus | null;
 };
@@ -52,9 +54,10 @@ export function HomePage() {
   const [authBusy, setAuthBusy] = useState(false);
 
   async function loadOverview() {
-    const [scannersRes, analysis, symbolsRes, auth] = await Promise.all([
+    const [scannersRes, analysis, temperature, symbolsRes, auth] = await Promise.all([
       listScanners(),
       getAnalysis(),
+      getTemperature(),
       getAnalysisSymbols(),
       apiFetch<AuthStatus>("/market/auth/status").catch(() => null),
     ]);
@@ -62,6 +65,7 @@ export function HomePage() {
     setData({
       scanners: scannersRes.scanners,
       analysis,
+      temperature,
       symbols: symbolsRes.symbols,
       auth,
     });
@@ -131,6 +135,9 @@ export function HomePage() {
     const tasRunning =
       data.analysis.activeRun?.status === "queued" ||
       data.analysis.activeRun?.status === "running";
+    const hisRunning =
+      data.temperature.activeRun?.status === "queued" ||
+      data.temperature.activeRun?.status === "running";
 
     return {
       enabledEvgCount: enabledEvg.length,
@@ -143,6 +150,7 @@ export function HomePage() {
       nextEvg,
       evgRunning,
       tasRunning,
+      hisRunning,
     };
   }, [data]);
 
@@ -157,9 +165,10 @@ export function HomePage() {
         <h1>Overview</h1>
         <p>
           Pipeline health for{" "}
-          <AcronymLabel acronym="EVG" layout="inline" /> and{" "}
-          <AcronymLabel acronym="TAS" layout="inline" /> — what’s gated, what’s
-          analyzed, and what’s moving versus lookback.
+          <AcronymLabel acronym="EVG" layout="inline" />,{" "}
+          <AcronymLabel acronym="TAS" layout="inline" />, and{" "}
+          <AcronymLabel acronym="HIS" layout="inline" /> — what’s gated, analyzed,
+          and how hot the crash scores are.
         </p>
       </header>
 
@@ -217,6 +226,33 @@ export function HomePage() {
               </p>
               <Link className="home-pipe-link" to="/analysis">
                 Open {PRODUCT_NAMES.TAS} <ArrowRight size={14} strokeWidth={2.5} />
+              </Link>
+            </article>
+
+            <article className="home-pipe">
+              <div className="home-pipe-top">
+                <AcronymLabel acronym="HIS" />
+                <span
+                  className={`home-pill tone-${derived.hisRunning ? "run" : data.temperature.config.enabled ? "ok" : "idle"}`}
+                >
+                  {derived.hisRunning
+                    ? "Running"
+                    : data.temperature.config.enabled
+                      ? "On"
+                      : "Off"}
+                </span>
+              </div>
+              <p className="home-pipe-metric">
+                <em>
+                  {data.temperature.scoredCount}/{data.temperature.analyzedCount}
+                </em>{" "}
+                scored
+              </p>
+              <p className="home-pipe-meta">
+                Next {formatDateTime(data.temperature.config.nextRunAt)}
+              </p>
+              <Link className="home-pipe-link" to="/temperature">
+                Open {PRODUCT_NAMES.HIS} <ArrowRight size={14} strokeWidth={2.5} />
               </Link>
             </article>
 
@@ -295,6 +331,21 @@ export function HomePage() {
                 <span className="home-run-detail">
                   {data.analysis.config.lastRunAt
                     ? `${formatDateTime(data.analysis.config.lastRunAt)} · ${data.analysis.config.lastRunOk ?? 0} ok · ${data.analysis.config.lastRunFailed ?? 0} failed`
+                    : "—"}
+                </span>
+              </div>
+              <div className="home-run-row">
+                <span className="home-run-name">
+                  <AcronymLabel acronym="HIS" layout="inline" />
+                </span>
+                <span
+                  className={`home-run-status tone-${statusTone(data.temperature.config.lastRunStatus)}`}
+                >
+                  {data.temperature.config.lastRunStatus ?? "never"}
+                </span>
+                <span className="home-run-detail">
+                  {data.temperature.config.lastRunAt
+                    ? `${formatDateTime(data.temperature.config.lastRunAt)} · ${data.temperature.config.lastRunOk ?? 0} ok · ${data.temperature.config.lastRunFailed ?? 0} failed`
                     : "—"}
                 </span>
               </div>
