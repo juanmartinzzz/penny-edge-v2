@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Play, Save, Thermometer } from "lucide-react";
+import { Play, Save, Thermometer, Tv } from "lucide-react";
 import { Button } from "../components/interaction/Button";
 import { NumericInput } from "../components/interaction/NumericInput";
 import {
@@ -11,6 +11,7 @@ import {
 import { AcronymLabel } from "../components/AcronymLabel";
 import {
   TableExpandableRows,
+  afterGroupBoundary,
   type TableColumn,
 } from "../components/interaction/TableExpandableRows";
 import {
@@ -32,6 +33,7 @@ import {
 } from "../lib/temperature";
 import { PRODUCT_NAMES } from "../lib/productNames";
 import { formatDateTime } from "../lib/dates";
+import { generateTradingViewUrl } from "../lib/tradingView";
 import "./TemperaturePage.css";
 
 type DraftState = {
@@ -76,15 +78,9 @@ function tempTone(value: number | null | undefined): string {
   return " is-cool";
 }
 
-function cobutaDividerAfter(
-  row: TemperatureSymbol,
-  nextRow: TemperatureSymbol | undefined,
-) {
-  if (!nextRow) return null;
-  if (!isCobutaTemperature(row.temperature)) return null;
-  if (isCobutaTemperature(nextRow.temperature)) return null;
-
-  return (
+const cobutaDividerAfter = afterGroupBoundary<TemperatureSymbol>(
+  (row) => isCobutaTemperature(row.temperature),
+  () => (
     <div
       className="temperature-cobuta"
       role="separator"
@@ -97,8 +93,8 @@ function cobutaDividerAfter(
         className="temperature-cobuta-label"
       />
     </div>
-  );
-}
+  ),
+);
 
 const symbolColumns: TableColumn<TemperatureSymbol>[] = [
   {
@@ -149,6 +145,29 @@ const symbolColumns: TableColumn<TemperatureSymbol>[] = [
     accessor: (row) => row.temperatureAt,
     cell: (row) =>
       row.temperatureAt ? formatDateTime(row.temperatureAt) : "—",
+  },
+  {
+    id: "tradingView",
+    header: "TV",
+    sortable: false,
+    accessor: (row) => row.symbol,
+    cell: (row) => (
+      <a
+        className="temperature-tv-link"
+        href={generateTradingViewUrl({
+          symbol: row.symbol,
+          exchange: row.exchange,
+        })}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Open ${row.symbol} on TradingView`}
+        title="Open in TradingView"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <Tv size={13} strokeWidth={2.25} aria-hidden="true" />
+        <span>TV</span>
+      </a>
+    ),
   },
 ];
 

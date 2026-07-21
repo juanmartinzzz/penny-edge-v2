@@ -51,6 +51,8 @@ type TableExpandableRowsProps<T> = {
   /**
    * Optional divider rendered after a data row (and its expanded panel).
    * `nextRow` is the following row in the full sorted list (may be on the next page).
+   *
+   * For “section below a group” UIs (e.g. COBUTA), prefer {@link afterGroupBoundary}.
    */
   rowDividerAfter?: (row: T, nextRow: T | undefined) => ReactNode | null;
   empty?: ReactNode;
@@ -122,6 +124,24 @@ function normalizePageSize(raw: string): number | null {
   const parsed = Number(raw.trim());
   if (!Number.isFinite(parsed) || parsed < MIN_PAGE_SIZE) return null;
   return Math.floor(parsed);
+}
+
+/**
+ * Builds a `rowDividerAfter` callback that draws once at each group→non-group
+ * boundary in the current sorted order (pagination-aware via `nextRow`).
+ *
+ * With a contiguous group at the top (e.g. temp↓ + COBUTA), that is the line
+ * under the last / lowest member of the group.
+ */
+export function afterGroupBoundary<T>(
+  isMember: (row: T) => boolean,
+  render: () => ReactNode,
+): (row: T, nextRow: T | undefined) => ReactNode | null {
+  return (row, nextRow) => {
+    if (!nextRow) return null;
+    if (!isMember(row) || isMember(nextRow)) return null;
+    return render();
+  };
 }
 
 export function TableExpandableRows<T>({

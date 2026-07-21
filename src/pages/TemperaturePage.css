@@ -115,6 +115,23 @@
   color: var(--text-muted);
 }
 
+.temperature-tv-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  color: var(--text-muted);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  transition: color 160ms ease;
+}
+
+.temperature-tv-link:hover {
+  color: var(--text);
+}
+
 .temperature-cobuta {
   position: relative;
   display: flex;
