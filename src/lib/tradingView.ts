@@ -1,43 +1,8 @@
 /**
- * TradingView chart URLs — ported from legacy penny-edge utils.
- * Maps Yahoo/scanner exchange codes to TradingView exchange prefixes.
+ * Re-export shared TradingView helpers for the web app.
+ * Canonical mapping lives in `shared/tradingView.ts` (also used by the API worker).
  */
-
-export type TradingViewSymbol = {
-  symbol: string;
-  exchange: string | null;
-};
-
-function tradingViewExchange(exchange: string | null): string {
-  if (!exchange) return "TSX";
-
-  switch (exchange.toUpperCase()) {
-    case "TO":
-    case "TOR":
-      return "TSX";
-    case "V":
-    case "VAN":
-    case "CNQ":
-      return "TSXV";
-    case "NMS":
-      return "NASDAQ";
-    case "NYQ":
-      return "NYSE";
-    case "ASE":
-      return "AMEX";
-    case "PCX":
-      return "NASDAQ";
-    default:
-      return exchange.toUpperCase();
-  }
-}
-
-/** Chart URL for a symbol, opening the TradingView chart page. */
-export function generateTradingViewUrl({
-  symbol,
-  exchange,
-}: TradingViewSymbol): string {
-  const baseSymbol = symbol.includes(".") ? symbol.split(".")[0]! : symbol;
-  const tvSymbol = `${tradingViewExchange(exchange)}:${baseSymbol}`;
-  return `https://www.tradingview.com/chart/?symbol=${encodeURIComponent(tvSymbol)}`;
-}
+export {
+  generateTradingViewUrl,
+  type TradingViewSymbol,
+} from "../../shared/tradingView";
