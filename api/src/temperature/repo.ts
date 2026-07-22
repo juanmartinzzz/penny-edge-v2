@@ -158,8 +158,35 @@ export async function updateSymbolTemperature(
     componentsJson: string;
     temperatureAt: string;
     temperatureRunId: string;
+    /** When set, updates the one-shot COBUTA alert flag. */
+    cobutaAlerted?: number;
   },
 ): Promise<void> {
+  if (input.cobutaAlerted !== undefined) {
+    await db
+      .prepare(
+        `UPDATE warm_symbols SET
+           temperature = ?,
+           temperature_components_json = ?,
+           temperature_at = ?,
+           temperature_run_id = ?,
+           cobuta_alerted = ?,
+           updated_at = ?
+         WHERE id = ?`,
+      )
+      .bind(
+        input.temperature,
+        input.componentsJson,
+        input.temperatureAt,
+        input.temperatureRunId,
+        input.cobutaAlerted,
+        input.temperatureAt,
+        symbolId,
+      )
+      .run();
+    return;
+  }
+
   await db
     .prepare(
       `UPDATE warm_symbols SET
@@ -178,6 +205,43 @@ export async function updateSymbolTemperature(
       input.temperatureAt,
       symbolId,
     )
+    .run();
+}
+
+/** Warm symbols currently in the COBUTA band that have not been Telegram-alerted. */
+export async function listUnalertedCobutaSymbols(
+  db: D1Database,
+  threshold: number,
+): Promise<WarmSymbolRow[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM warm_symbols
+       WHERE is_warm = 1
+         AND temperature IS NOT NULL
+         AND temperature >= ?
+         AND cobuta_alerted = 0
+       ORDER BY temperature DESC, exchange ASC, symbol ASC`,
+    )
+    .bind(threshold)
+    .all<WarmSymbolRow>();
+  return result.results ?? [];
+}
+
+export async function markCobutaAlerted(
+  db: D1Database,
+  symbolIds: string[],
+  at: string,
+): Promise<void> {
+  if (symbolIds.length === 0) return;
+
+  // D1 supports bound IN lists via repeated placeholders.
+  const placeholders = symbolIds.map(() => "?").join(", ");
+  await db
+    .prepare(
+      `UPDATE warm_symbols SET cobuta_alerted = 1, updated_at = ?
+       WHERE id IN (${placeholders})`,
+    )
+    .bind(at, ...symbolIds)
     .run();
 }
 

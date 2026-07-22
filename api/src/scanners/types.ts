@@ -67,6 +67,11 @@ export interface WarmSymbolRow {
   temperature_components_json?: string | null;
   temperature_at?: string | null;
   temperature_run_id?: string | null;
+  /**
+   * 1 after a COBUTA Telegram alert was sent for this stay in the ≥90 band.
+   * Cleared when temperature drops below COBUTA.
+   */
+  cobuta_alerted?: number;
   created_at: string;
   updated_at: string;
 }

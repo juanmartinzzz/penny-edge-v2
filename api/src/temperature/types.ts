@@ -7,6 +7,16 @@ import type { SymbolAnalysis } from "../analysis/types";
 export type TemperatureRunStatus = "queued" | "running" | "ok" | "error";
 export type TemperatureRunTrigger = "manual" | "cron";
 
+/**
+ * Minimum temperature for COBUTA (Consider Buying These Assets).
+ * Keep in sync with `src/lib/temperature.ts` on the client.
+ */
+export const COBUTA_TEMP_THRESHOLD = 90;
+
+export function isCobutaTemperature(value: number | null | undefined): boolean {
+  return value != null && value >= COBUTA_TEMP_THRESHOLD;
+}
+
 /** Tunable scoring knobs (stored as JSON on temperature_config). */
 export type TemperatureParams = {
   /** How far back (hours) we measure the recent move. */

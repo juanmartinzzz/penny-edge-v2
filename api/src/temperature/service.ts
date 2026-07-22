@@ -5,6 +5,11 @@
 import { parseAnalysisJson } from "../analysis/types";
 import type { WarmSymbolRow } from "../scanners/types";
 import {
+  formatCobutaAlert,
+  sendTelegramMessage,
+  type TelegramEnv,
+} from "../telegram";
+import {
   configParams,
   countScoredWarmSymbols,
   countWarmWithAnalysis,
@@ -14,13 +19,17 @@ import {
   getTemperatureRun,
   isTemperatureDue,
   listAllWarmSymbolsWithTemperature,
+  listUnalertedCobutaSymbols,
   listWarmSymbolsWithAnalysisPage,
+  markCobutaAlerted,
   updateSymbolTemperature,
   updateTemperatureConfig,
   updateTemperatureRun,
 } from "./repo";
 import {
   addHours,
+  COBUTA_TEMP_THRESHOLD,
+  isCobutaTemperature,
   normalizeTemperatureParamsPatch,
   nowIso,
   parseTemperatureParams,
@@ -31,7 +40,7 @@ import {
   DEFAULT_TEMPERATURE_PARAMS,
 } from "./types";
 
-export interface TemperatureEnv {
+export interface TemperatureEnv extends TelegramEnv {
   DB: D1Database;
   TEMPERATURE_QUEUE: Queue<TemperatureJobMessage>;
   TEMPERATURE_PAGE_SIZE?: string;
@@ -317,6 +326,7 @@ export async function processTemperatureJob(
           componentsJson: JSON.stringify({ error: errText, source: "none" }),
           temperatureAt: asOf,
           temperatureRunId: run.id,
+          cobutaAlerted: 0,
         });
       }
     }
@@ -373,6 +383,8 @@ export async function processTemperatureJob(
       last_run_failed: totalFailed,
       next_run_at: nextRunAt,
     });
+
+    await maybeAlertNewCobuta(env, finishedAt);
   } catch (error) {
     const messageText = error instanceof Error ? error.message : "Unknown error";
     console.error(`HIS run ${run.id} failed:`, error);
@@ -406,13 +418,49 @@ async function scoreAndStore(
 ): Promise<void> {
   const analysis = parseAnalysisJson(symbol.analysis_json ?? null);
   const result = scoreTemperature(analysis, params);
+  const inCobuta = isCobutaTemperature(result.temperature);
+  const wasAlerted = (symbol.cobuta_alerted ?? 0) === 1;
 
   await updateSymbolTemperature(db, symbol.id, {
     temperature: result.temperature,
     componentsJson: JSON.stringify(result.components),
     temperatureAt: asOf,
     temperatureRunId: runId,
+    // Clear the one-shot flag when leaving COBUTA; preserve while still in-band.
+    cobutaAlerted: inCobuta && wasAlerted ? 1 : 0,
   });
+}
+
+/**
+ * After a successful HIS run: Telegram any newly entered COBUTA names, then
+ * stamp them so the next run stays quiet until they drop out of the band.
+ */
+async function maybeAlertNewCobuta(
+  env: TemperatureEnv,
+  at: string,
+): Promise<void> {
+  const fresh = await listUnalertedCobutaSymbols(env.DB, COBUTA_TEMP_THRESHOLD);
+  if (fresh.length === 0) return;
+
+  const tickers = fresh.map((row) => ({
+    symbol: row.symbol,
+    exchange: row.exchange,
+  }));
+  const sent = await sendTelegramMessage(env, formatCobutaAlert(tickers), {
+    parseMode: "HTML",
+  });
+  if (!sent) {
+    console.warn(
+      `COBUTA alert not sent for ${tickers.map((t) => t.symbol).join(", ")} — will retry next HIS run`,
+    );
+    return;
+  }
+
+  await markCobutaAlerted(
+    env.DB,
+    fresh.map((row) => row.id),
+    at,
+  );
 }
 
 export async function getTemperatureRunStatus(
