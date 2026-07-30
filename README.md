@@ -67,7 +67,7 @@ Product name for per-exchange warm-symbol jobs (10d volume + approx daily value 
 | `POST` | `/scanners/:id/run` | Queue an EVG run now |
 | `GET` | `/scanners/runs/:runId` | Poll run progress |
 
-Runs process via Queue `penny-edge-scanner-jobs` in pages of 50, upserting matches after each page. Cron `0 * * * *` starts due enabled EVG scanners (next run waits a full interval after enable).
+Runs process via Queue `penny-edge-scanner-jobs` in pages of 50, upserting matches after each page. Cron `*/5 * * * *` starts due enabled EVG scanners (next run waits a full interval after enable).
 
 ### Trend Analysis for Symbols (TAS)
 
@@ -81,7 +81,7 @@ Product name for scheduled deep price analysis of all EVG-gated (`is_warm`) symb
 | `POST` | `/analysis/run` | Queue a TAS run now |
 | `GET` | `/analysis/runs/:runId` | Poll run progress |
 
-Runs process via Queue `penny-edge-analysis-jobs` in small pages (default 5). Same hourly cron as EVG; `next_run_at` gates work. Defaults: lookback 21 days, roll window 3 hours, price-only rolling averages.
+Runs process via Queue `penny-edge-analysis-jobs` in small pages (default 5). Same 5-minute cron as EVG; `next_run_at` gates work. Defaults: lookback 21 days, roll window 3 hours, price-only rolling averages.
 
 ### Heat and Interest Scale (HIS)
 
@@ -95,7 +95,7 @@ Product name for scheduled crash-heat scoring (0–100) of TAS snapshots. No Yah
 | `POST` | `/temperature/run` | Queue a HIS run now |
 | `GET` | `/temperature/runs/:runId` | Poll run progress |
 
-Runs process via Queue `penny-edge-temperature-jobs`. Same hourly cron; `next_run_at` gates work. High scores = deep, sharp, recent drops; flat/rising names are dampened.
+Runs process via Queue `penny-edge-temperature-jobs`. Same 5-minute cron; `next_run_at` gates work. High scores = deep, sharp, recent drops; flat/rising names are dampened.
 
 ## Design notes
 
