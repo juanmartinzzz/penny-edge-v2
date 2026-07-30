@@ -31,6 +31,17 @@ type Draft = {
   executionNotes: string;
 };
 
+type FeatureEditorProps = {
+  title: string;
+  draft: Draft;
+  busy: boolean;
+  typePillOptions: { value: string; label: string }[];
+  statusPillOptions: { value: string; label: string }[];
+  onDraftChange: (updater: (draft: Draft) => Draft) => void;
+  onSave: () => void;
+  onCancel: () => void;
+};
+
 function emptyDraft(defaultType = "visibility"): Draft {
   return {
     title: "",
@@ -87,6 +98,154 @@ function draftToInput(draft: Draft): FutureFeatureInput {
 
 function statusLabel(status: FutureFeatureStatus): string {
   return FUTURE_FEATURE_STATUSES.find((s) => s.value === status)?.label ?? status;
+}
+
+/** Split body into paragraph cards: blank lines first, else one card per non-empty line. */
+function bodyParagraphs(body: string): string[] {
+  const trimmed = body.trim();
+  if (!trimmed) return [];
+
+  const byBlank = trimmed
+    .split(/\n\s*\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (byBlank.length > 1) return byBlank;
+
+  return trimmed
+    .split(/\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function FeatureEditor({
+  title,
+  draft,
+  busy,
+  typePillOptions,
+  statusPillOptions,
+  onDraftChange,
+  onSave,
+  onCancel,
+}: FeatureEditorProps) {
+  return (
+    <div className="ff-editor">
+      <div className="ff-editor-top">
+        <strong>{title}</strong>
+        <Button variant="ghost" iconOnly aria-label="Cancel edit" onClick={onCancel}>
+          <X size={16} />
+        </Button>
+      </div>
+
+      <div className="ff-editor-grid">
+        <label className="ff-field ff-field-span-2">
+          <span>Title</span>
+          <input
+            value={draft.title}
+            onChange={(e) =>
+              onDraftChange((d) => ({ ...d, title: e.target.value }))
+            }
+            placeholder="Short name"
+          />
+        </label>
+
+        <div className="ff-field ff-field-span-2">
+          <PillSelect
+            label="Type"
+            options={typePillOptions}
+            value={draft.typeSelect}
+            onChange={(typeSelect) => onDraftChange((d) => ({ ...d, typeSelect }))}
+          />
+        </div>
+
+        {draft.typeSelect === CUSTOM_TYPE_VALUE ? (
+          <label className="ff-field ff-field-span-2">
+            <span>Custom type</span>
+            <input
+              value={draft.customType}
+              autoFocus
+              placeholder="e.g. replayability"
+              onChange={(e) =>
+                onDraftChange((d) => ({ ...d, customType: e.target.value }))
+              }
+            />
+          </label>
+        ) : null}
+
+        <div className="ff-field ff-field-span-2">
+          <PillSelect
+            label="Status"
+            options={statusPillOptions}
+            value={draft.status}
+            onChange={(status) =>
+              onDraftChange((d) => ({
+                ...d,
+                status: status as FutureFeatureStatus,
+              }))
+            }
+          />
+        </div>
+
+        <label className="ff-field ff-field-span-2">
+          <span>Body</span>
+          <textarea
+            rows={5}
+            value={draft.body}
+            onChange={(e) =>
+              onDraftChange((d) => ({ ...d, body: e.target.value }))
+            }
+            placeholder="One idea per paragraph (blank line or new line → its own card)…"
+          />
+        </label>
+
+        <label className="ff-field ff-field-span-2">
+          <span>Tags</span>
+          <input
+            value={draft.tags}
+            onChange={(e) =>
+              onDraftChange((d) => ({ ...d, tags: e.target.value }))
+            }
+            placeholder="Comma-separated"
+          />
+        </label>
+
+        <label className="ff-field ff-field-span-2">
+          <span>Execution notes</span>
+          <textarea
+            rows={3}
+            value={draft.executionNotes}
+            onChange={(e) =>
+              onDraftChange((d) => ({ ...d, executionNotes: e.target.value }))
+            }
+            placeholder="One note per paragraph (blank line or new line → its own card)…"
+          />
+        </label>
+
+        <label className="ff-field ff-field-span-2">
+          <span>Payload JSON</span>
+          <textarea
+            rows={4}
+            className="ff-mono"
+            value={draft.payloadJson}
+            onChange={(e) =>
+              onDraftChange((d) => ({ ...d, payloadJson: e.target.value }))
+            }
+            placeholder='{"area":"api","hint":"…"}'
+          />
+        </label>
+      </div>
+
+      <div className="ff-editor-actions">
+        <Button onClick={onSave} disabled={busy}>
+          <Save size={16} strokeWidth={2.5} />
+          {busy ? "Saving…" : "Save"}
+        </Button>
+        <Button variant="ghost" onClick={onCancel} disabled={busy}>
+          Cancel
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export function FutureFeaturesPage() {
@@ -235,9 +394,6 @@ export function FutureFeaturesPage() {
     try {
       await updateFutureFeature(feature.id, { status });
       await reload({ status: statusFilter, type: typeFilter, q: query.trim() });
-      if (editingId === feature.id) {
-        setDraft((d) => ({ ...d, status }));
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update status");
     } finally {
@@ -245,7 +401,8 @@ export function FutureFeaturesPage() {
     }
   }
 
-  const editorOpen = creating || editingId !== null;
+  const showEmpty = !loading && features.length === 0 && !creating;
+  const showList = !loading && (features.length > 0 || creating);
 
   return (
     <motion.section
@@ -297,120 +454,7 @@ export function FutureFeaturesPage() {
       {error ? <p className="future-features-error">{error}</p> : null}
       {loading ? <p className="future-features-status">Loading…</p> : null}
 
-      {editorOpen ? (
-        <div className="ff-editor">
-          <div className="ff-editor-top">
-            <strong>{creating ? "New feature" : "Edit feature"}</strong>
-            <Button variant="ghost" iconOnly aria-label="Close editor" onClick={closeEditor}>
-              <X size={16} />
-            </Button>
-          </div>
-
-          <div className="ff-editor-grid">
-            <label className="ff-field ff-field-span-2">
-              <span>Title</span>
-              <input
-                value={draft.title}
-                onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))}
-                placeholder="Short name"
-              />
-            </label>
-
-            <div className="ff-field ff-field-span-2">
-              <PillSelect
-                label="Type"
-                options={typePillOptions}
-                value={draft.typeSelect}
-                onChange={(typeSelect) => setDraft((d) => ({ ...d, typeSelect }))}
-              />
-            </div>
-
-            {draft.typeSelect === CUSTOM_TYPE_VALUE ? (
-              <label className="ff-field ff-field-span-2">
-                <span>Custom type</span>
-                <input
-                  value={draft.customType}
-                  autoFocus
-                  placeholder="e.g. replayability"
-                  onChange={(e) =>
-                    setDraft((d) => ({ ...d, customType: e.target.value }))
-                  }
-                />
-              </label>
-            ) : null}
-
-            <div className="ff-field ff-field-span-2">
-              <PillSelect
-                label="Status"
-                options={statusPillOptions}
-                value={draft.status}
-                onChange={(status) =>
-                  setDraft((d) => ({
-                    ...d,
-                    status: status as FutureFeatureStatus,
-                  }))
-                }
-              />
-            </div>
-
-            <label className="ff-field ff-field-span-2">
-              <span>Body</span>
-              <textarea
-                rows={5}
-                value={draft.body}
-                onChange={(e) => setDraft((d) => ({ ...d, body: e.target.value }))}
-                placeholder="Acceptance notes, context, links…"
-              />
-            </label>
-
-            <label className="ff-field ff-field-span-2">
-              <span>Tags</span>
-              <input
-                value={draft.tags}
-                onChange={(e) => setDraft((d) => ({ ...d, tags: e.target.value }))}
-                placeholder="Comma-separated"
-              />
-            </label>
-
-            <label className="ff-field ff-field-span-2">
-              <span>Execution notes</span>
-              <textarea
-                rows={3}
-                value={draft.executionNotes}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, executionNotes: e.target.value }))
-                }
-                placeholder="How to run this later (wrangler, agent prompt, …)"
-              />
-            </label>
-
-            <label className="ff-field ff-field-span-2">
-              <span>Payload JSON</span>
-              <textarea
-                rows={4}
-                className="ff-mono"
-                value={draft.payloadJson}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, payloadJson: e.target.value }))
-                }
-                placeholder='{"area":"api","hint":"…"}'
-              />
-            </label>
-          </div>
-
-          <div className="ff-editor-actions">
-            <Button onClick={handleSave} disabled={busy}>
-              <Save size={16} strokeWidth={2.5} />
-              {busy ? "Saving…" : "Save"}
-            </Button>
-            <Button variant="ghost" onClick={closeEditor} disabled={busy}>
-              Cancel
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      {!loading && features.length === 0 ? (
+      {showEmpty ? (
         <div className="ff-empty">
           <Lightbulb size={22} strokeWidth={2} />
           <p>No future features yet. Add one to start the backlog.</p>
@@ -419,43 +463,95 @@ export function FutureFeaturesPage() {
             New feature
           </Button>
         </div>
-      ) : (
+      ) : null}
+
+      {showList ? (
         <ul className="ff-list">
+          {creating ? (
+            <li className="ff-item is-editing">
+              <FeatureEditor
+                title="New feature"
+                draft={draft}
+                busy={busy}
+                typePillOptions={typePillOptions}
+                statusPillOptions={statusPillOptions}
+                onDraftChange={setDraft}
+                onSave={() => void handleSave()}
+                onCancel={closeEditor}
+              />
+            </li>
+          ) : null}
+
           {features.map((feature) => {
             const active = editingId === feature.id;
-            return (
-              <li
-                key={feature.id}
-                className={`ff-item${active ? " is-active" : ""}`}
-              >
-                <div className="ff-item-main">
-                  <button
-                    type="button"
-                    className="ff-item-header"
-                    onClick={() => openEdit(feature)}
-                  >
-                    <div className="ff-item-title-row">
-                      <strong>{feature.title}</strong>
-                      <span className={`ff-pill status-${feature.status}`}>
-                        {statusLabel(feature.status)}
-                      </span>
-                    </div>
-                    <div className="ff-item-meta">
-                      <span className="ff-type">{feature.typeLabel}</span>
-                      <span>Created {formatDateTime(feature.createdAt)}</span>
-                      <span>Updated {formatDateTime(feature.updatedAt)}</span>
-                      {feature.executedAt ? (
-                        <span>Executed {formatDateTime(feature.executedAt)}</span>
-                      ) : null}
-                    </div>
-                  </button>
 
-                  {!active ? (
+            if (active) {
+              return (
+                <li key={feature.id} className="ff-item is-editing">
+                  <FeatureEditor
+                    title="Edit feature"
+                    draft={draft}
+                    busy={busy}
+                    typePillOptions={typePillOptions}
+                    statusPillOptions={statusPillOptions}
+                    onDraftChange={setDraft}
+                    onSave={() => void handleSave()}
+                    onCancel={closeEditor}
+                  />
+                </li>
+              );
+            }
+
+            return (
+              <li key={feature.id} className="ff-item">
+                <div className="ff-item-topline">
+                  <span className="ff-topline-cell">
+                    <span className="ff-type">{feature.typeLabel}</span>
+                  </span>
+                  <span className="ff-topline-cell">
+                    <span className={`ff-pill status-${feature.status}`}>
+                      {statusLabel(feature.status)}
+                    </span>
+                  </span>
+                  <span className="ff-topline-cell">
+                    Created {formatDateTime(feature.createdAt)}
+                  </span>
+                  <span className="ff-topline-cell">
+                    Updated {formatDateTime(feature.updatedAt)}
+                  </span>
+                  {feature.executedAt ? (
+                    <span className="ff-topline-cell">
+                      Executed {formatDateTime(feature.executedAt)}
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="ff-item-body">
+                  <div className="ff-item-main">
+                    <button
+                      type="button"
+                      className="ff-item-header"
+                      onClick={() => openEdit(feature)}
+                    >
+                      <div className="ff-item-title-row">
+                        <strong>{feature.title}</strong>
+                      </div>
+                    </button>
+
                     <div className="ff-item-detail">
                       {feature.body ? (
                         <section className="ff-detail-block">
                           <h3>Body</h3>
-                          <p className="ff-detail-text">{feature.body}</p>
+                          <div className="ff-body-grid">
+                            {bodyParagraphs(feature.body).map((paragraph, index) => (
+                              <article
+                                key={`${feature.id}-p-${index}`}
+                                className="ff-body-card"
+                              >
+                                <p>{paragraph}</p>
+                              </article>
+                            ))}
+                          </div>
                         </section>
                       ) : null}
 
@@ -475,7 +571,18 @@ export function FutureFeaturesPage() {
                       {feature.executionNotes ? (
                         <section className="ff-detail-block">
                           <h3>Execution notes</h3>
-                          <p className="ff-detail-text">{feature.executionNotes}</p>
+                          <div className="ff-body-grid">
+                            {bodyParagraphs(feature.executionNotes).map(
+                              (paragraph, index) => (
+                                <article
+                                  key={`${feature.id}-en-${index}`}
+                                  className="ff-body-card"
+                                >
+                                  <p>{paragraph}</p>
+                                </article>
+                              ),
+                            )}
+                          </div>
                         </section>
                       ) : null}
 
@@ -493,49 +600,50 @@ export function FutureFeaturesPage() {
                         <p className="ff-detail-empty">No details yet — click to edit.</p>
                       ) : null}
                     </div>
-                  ) : null}
-                </div>
-                <div className="ff-item-actions">
-                  <Button
-                    variant="ghost"
-                    disabled={busy || active}
-                    onClick={() => openEdit(feature)}
-                  >
-                    Edit
-                  </Button>
-                  {feature.status !== "ready" ? (
+                  </div>
+
+                  <div className="ff-item-actions">
                     <Button
                       variant="ghost"
-                      disabled={busy}
-                      onClick={() => handleQuickStatus(feature, "ready")}
+                      disabled={busy || creating}
+                      onClick={() => openEdit(feature)}
                     >
-                      Ready
+                      Edit
                     </Button>
-                  ) : null}
-                  {feature.status !== "done" ? (
+                    {feature.status !== "ready" ? (
+                      <Button
+                        variant="ghost"
+                        disabled={busy || creating}
+                        onClick={() => handleQuickStatus(feature, "ready")}
+                      >
+                        Ready
+                      </Button>
+                    ) : null}
+                    {feature.status !== "done" ? (
+                      <Button
+                        variant="ghost"
+                        disabled={busy || creating}
+                        onClick={() => handleQuickStatus(feature, "done")}
+                      >
+                        Done
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
-                      disabled={busy}
-                      onClick={() => handleQuickStatus(feature, "done")}
+                      iconOnly
+                      aria-label="Delete"
+                      disabled={busy || creating}
+                      onClick={() => handleDelete(feature.id)}
                     >
-                      Done
+                      <Trash2 size={16} />
                     </Button>
-                  ) : null}
-                  <Button
-                    variant="ghost"
-                    iconOnly
-                    aria-label="Delete"
-                    disabled={busy}
-                    onClick={() => handleDelete(feature.id)}
-                  >
-                    <Trash2 size={16} />
-                  </Button>
+                  </div>
                 </div>
               </li>
             );
           })}
         </ul>
-      )}
+      ) : null}
     </motion.section>
   );
 }
