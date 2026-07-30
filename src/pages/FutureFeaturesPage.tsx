@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Lightbulb, Plus, Save, Trash2, X } from "lucide-react";
 import { Button } from "../components/interaction/Button";
+import { PillSelect } from "../components/interaction/PillSelect";
 import {
   createFutureFeature,
   deleteFutureFeature,
@@ -21,12 +22,10 @@ const CUSTOM_TYPE_VALUE = "__custom__";
 
 type Draft = {
   title: string;
-  summary: string;
   body: string;
   typeSelect: string;
   customType: string;
   status: FutureFeatureStatus;
-  priority: string;
   tags: string;
   payloadJson: string;
   executionNotes: string;
@@ -35,12 +34,10 @@ type Draft = {
 function emptyDraft(defaultType = "visibility"): Draft {
   return {
     title: "",
-    summary: "",
     body: "",
     typeSelect: defaultType,
     customType: "",
     status: "idea",
-    priority: "0",
     tags: "",
     payloadJson: "",
     executionNotes: "",
@@ -51,12 +48,10 @@ function draftFromFeature(feature: FutureFeature, types: FutureFeatureTypeOption
   const known = types.some((t) => t.value === feature.type);
   return {
     title: feature.title,
-    summary: feature.summary ?? "",
     body: feature.body ?? "",
     typeSelect: known ? feature.type : CUSTOM_TYPE_VALUE,
     customType: known ? "" : feature.type,
     status: feature.status,
-    priority: String(feature.priority),
     tags: feature.tags.join(", "),
     payloadJson: feature.payloadJson ?? "",
     executionNotes: feature.executionNotes ?? "",
@@ -69,9 +64,6 @@ function resolveType(draft: Draft): string {
 }
 
 function draftToInput(draft: Draft): FutureFeatureInput {
-  const priority = Number(draft.priority);
-  if (!Number.isFinite(priority)) throw new Error("Priority must be a number");
-
   const tags = draft.tags
     .split(",")
     .map((t) => t.trim())
@@ -84,11 +76,9 @@ function draftToInput(draft: Draft): FutureFeatureInput {
 
   return {
     title: draft.title,
-    summary: draft.summary.trim() || null,
     body: draft.body.trim() || null,
     type: resolveType(draft),
     status: draft.status,
-    priority: Math.trunc(priority),
     tags,
     payloadJson: payloadJson || null,
     executionNotes: draft.executionNotes.trim() || null,
@@ -152,6 +142,38 @@ export function FutureFeaturesPage() {
   }, [statusFilter, typeFilter, query]);
 
   const typeOptions = useMemo(() => types, [types]);
+
+  const typePillOptions = useMemo(
+    () => [
+      ...typeOptions.map((t) => ({
+        value: t.value,
+        label: t.builtin ? t.label : `${t.label} (custom)`,
+      })),
+      { value: CUSTOM_TYPE_VALUE, label: "Custom…" },
+    ],
+    [typeOptions],
+  );
+
+  const statusPillOptions = useMemo(
+    () => FUTURE_FEATURE_STATUSES.map((s) => ({ value: s.value, label: s.label })),
+    [],
+  );
+
+  const statusFilterOptions = useMemo(
+    () => [{ value: "", label: "All" }, ...statusPillOptions],
+    [statusPillOptions],
+  );
+
+  const typeFilterOptions = useMemo(
+    () => [
+      { value: "", label: "All" },
+      ...typeOptions.map((t) => ({
+        value: t.value,
+        label: t.builtin ? t.label : `${t.label} (custom)`,
+      })),
+    ],
+    [typeOptions],
+  );
 
   function openCreate() {
     setCreating(true);
@@ -249,38 +271,24 @@ export function FutureFeaturesPage() {
       </header>
 
       <div className="future-features-filters">
-        <label className="ff-field">
-          <span>Status</span>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="">All</option>
-            {FUTURE_FEATURE_STATUSES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="ff-field">
-          <span>Type</span>
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
-            <option value="">All</option>
-            {typeOptions.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-                {!t.builtin ? " (custom)" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
+        <PillSelect
+          label="Status"
+          options={statusFilterOptions}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />
+        <PillSelect
+          label="Type"
+          options={typeFilterOptions}
+          value={typeFilter}
+          onChange={setTypeFilter}
+        />
         <label className="ff-field ff-field-grow">
           <span>Search</span>
           <input
             type="search"
             value={query}
-            placeholder="Title, summary, body…"
+            placeholder="Title, body…"
             onChange={(e) => setQuery(e.target.value)}
           />
         </label>
@@ -308,45 +316,17 @@ export function FutureFeaturesPage() {
               />
             </label>
 
-            <label className="ff-field">
-              <span>Type</span>
-              <select
+            <div className="ff-field ff-field-span-2">
+              <PillSelect
+                label="Type"
+                options={typePillOptions}
                 value={draft.typeSelect}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, typeSelect: e.target.value }))
-                }
-              >
-                {typeOptions.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                    {!t.builtin ? " (custom)" : ""}
-                  </option>
-                ))}
-                <option value={CUSTOM_TYPE_VALUE}>Custom…</option>
-              </select>
-            </label>
-
-            <label className="ff-field">
-              <span>Status</span>
-              <select
-                value={draft.status}
-                onChange={(e) =>
-                  setDraft((d) => ({
-                    ...d,
-                    status: e.target.value as FutureFeatureStatus,
-                  }))
-                }
-              >
-                {FUTURE_FEATURE_STATUSES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                onChange={(typeSelect) => setDraft((d) => ({ ...d, typeSelect }))}
+              />
+            </div>
 
             {draft.typeSelect === CUSTOM_TYPE_VALUE ? (
-              <label className="ff-field">
+              <label className="ff-field ff-field-span-2">
                 <span>Custom type</span>
                 <input
                   value={draft.customType}
@@ -359,25 +339,19 @@ export function FutureFeaturesPage() {
               </label>
             ) : null}
 
-            <label className="ff-field">
-              <span>Priority</span>
-              <input
-                value={draft.priority}
-                inputMode="numeric"
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, priority: e.target.value }))
+            <div className="ff-field ff-field-span-2">
+              <PillSelect
+                label="Status"
+                options={statusPillOptions}
+                value={draft.status}
+                onChange={(status) =>
+                  setDraft((d) => ({
+                    ...d,
+                    status: status as FutureFeatureStatus,
+                  }))
                 }
               />
-            </label>
-
-            <label className="ff-field ff-field-span-2">
-              <span>Summary</span>
-              <input
-                value={draft.summary}
-                onChange={(e) => setDraft((d) => ({ ...d, summary: e.target.value }))}
-                placeholder="One-liner"
-              />
-            </label>
+            </div>
 
             <label className="ff-field ff-field-span-2">
               <span>Body</span>
@@ -399,6 +373,18 @@ export function FutureFeaturesPage() {
             </label>
 
             <label className="ff-field ff-field-span-2">
+              <span>Execution notes</span>
+              <textarea
+                rows={3}
+                value={draft.executionNotes}
+                onChange={(e) =>
+                  setDraft((d) => ({ ...d, executionNotes: e.target.value }))
+                }
+                placeholder="How to run this later (wrangler, agent prompt, …)"
+              />
+            </label>
+
+            <label className="ff-field ff-field-span-2">
               <span>Payload JSON</span>
               <textarea
                 rows={4}
@@ -408,18 +394,6 @@ export function FutureFeaturesPage() {
                   setDraft((d) => ({ ...d, payloadJson: e.target.value }))
                 }
                 placeholder='{"area":"api","hint":"…"}'
-              />
-            </label>
-
-            <label className="ff-field ff-field-span-2">
-              <span>Execution notes</span>
-              <textarea
-                rows={3}
-                value={draft.executionNotes}
-                onChange={(e) =>
-                  setDraft((d) => ({ ...d, executionNotes: e.target.value }))
-                }
-                placeholder="How to run this later (wrangler, agent prompt, …)"
               />
             </label>
           </div>
@@ -454,27 +428,81 @@ export function FutureFeaturesPage() {
                 key={feature.id}
                 className={`ff-item${active ? " is-active" : ""}`}
               >
-                <button
-                  type="button"
-                  className="ff-item-main"
-                  onClick={() => openEdit(feature)}
-                >
-                  <div className="ff-item-title-row">
-                    <strong>{feature.title}</strong>
-                    <span className={`ff-pill status-${feature.status}`}>
-                      {statusLabel(feature.status)}
-                    </span>
-                  </div>
-                  <div className="ff-item-meta">
-                    <span className="ff-type">{feature.typeLabel}</span>
-                    <span>P{feature.priority}</span>
-                    <span>Updated {formatDateTime(feature.updatedAt)}</span>
-                  </div>
-                  {feature.summary ? (
-                    <p className="ff-item-summary">{feature.summary}</p>
+                <div className="ff-item-main">
+                  <button
+                    type="button"
+                    className="ff-item-header"
+                    onClick={() => openEdit(feature)}
+                  >
+                    <div className="ff-item-title-row">
+                      <strong>{feature.title}</strong>
+                      <span className={`ff-pill status-${feature.status}`}>
+                        {statusLabel(feature.status)}
+                      </span>
+                    </div>
+                    <div className="ff-item-meta">
+                      <span className="ff-type">{feature.typeLabel}</span>
+                      <span>Created {formatDateTime(feature.createdAt)}</span>
+                      <span>Updated {formatDateTime(feature.updatedAt)}</span>
+                      {feature.executedAt ? (
+                        <span>Executed {formatDateTime(feature.executedAt)}</span>
+                      ) : null}
+                    </div>
+                  </button>
+
+                  {!active ? (
+                    <div className="ff-item-detail">
+                      {feature.body ? (
+                        <section className="ff-detail-block">
+                          <h3>Body</h3>
+                          <p className="ff-detail-text">{feature.body}</p>
+                        </section>
+                      ) : null}
+
+                      {feature.tags.length > 0 ? (
+                        <section className="ff-detail-block">
+                          <h3>Tags</h3>
+                          <div className="ff-tag-list">
+                            {feature.tags.map((tag) => (
+                              <span key={tag} className="ff-tag">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </section>
+                      ) : null}
+
+                      {feature.executionNotes ? (
+                        <section className="ff-detail-block">
+                          <h3>Execution notes</h3>
+                          <p className="ff-detail-text">{feature.executionNotes}</p>
+                        </section>
+                      ) : null}
+
+                      {feature.payloadJson ? (
+                        <section className="ff-detail-block">
+                          <h3>Payload JSON</h3>
+                          <pre className="ff-detail-payload">{feature.payloadJson}</pre>
+                        </section>
+                      ) : null}
+
+                      {!feature.body &&
+                      feature.tags.length === 0 &&
+                      !feature.executionNotes &&
+                      !feature.payloadJson ? (
+                        <p className="ff-detail-empty">No details yet — click to edit.</p>
+                      ) : null}
+                    </div>
                   ) : null}
-                </button>
+                </div>
                 <div className="ff-item-actions">
+                  <Button
+                    variant="ghost"
+                    disabled={busy || active}
+                    onClick={() => openEdit(feature)}
+                  >
+                    Edit
+                  </Button>
                   {feature.status !== "ready" ? (
                     <Button
                       variant="ghost"
