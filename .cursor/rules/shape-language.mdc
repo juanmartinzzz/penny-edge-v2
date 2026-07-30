@@ -1,0 +1,19 @@
+---
+description: Penny Edge radius/token usage for interactive vs container UI
+alwaysApply: true
+---
+
+# Shape language
+
+Penny Edge uses **fully rounded** interactive controls and **modest radius** on containers.
+
+| Element | Token |
+| --- | --- |
+| Buttons, pill selects, status chips, tags, nav pills, toggle-like controls | `var(--radius-full)` |
+| Cards, panels, tables, editor shells | `var(--radius-md)` |
+| Small nested surfaces (code blocks, compact inputs inside panels) | `var(--radius-sm)` or `var(--radius-md)` |
+
+## Do not
+
+- Do not “de-AI” pill UIs by switching them to `--radius-sm`. Fully rounded pills are intentional brand language here.
+- Prefer matching nearby existing components (`Button`, `.home-pill`, `.scanner-pill`) over inventing a new radius for the same control type.

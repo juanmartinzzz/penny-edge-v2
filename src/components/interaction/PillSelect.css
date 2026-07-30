@@ -27,7 +27,7 @@
   gap: 0.35rem;
   padding: 0.35rem 0.7rem;
   border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-full);
   background: transparent;
   color: var(--text-muted);
   font-family: var(--font-display);
