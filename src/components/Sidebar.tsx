@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
+  Lightbulb,
   LineChart,
   Moon,
   PanelLeftClose,
@@ -17,7 +18,12 @@ import { PRODUCT_NAMES } from "../lib/productNames";
 import { useTheme } from "../lib/theme";
 import "./Sidebar.css";
 
-export type NavId = "overview" | "scanners" | "analysis" | "temperature";
+export type NavId =
+  | "overview"
+  | "scanners"
+  | "analysis"
+  | "temperature"
+  | "future-features";
 
 type SidebarProps = {
   collapsed: boolean;
@@ -35,6 +41,12 @@ const NAV_ITEMS: NavItem[] = [
   { id: "scanners", acronym: "EVG", path: "/scanners", icon: Radar },
   { id: "analysis", acronym: "TAS", path: "/analysis", icon: LineChart },
   { id: "temperature", acronym: "HIS", path: "/temperature", icon: Thermometer },
+  {
+    id: "future-features",
+    label: "Future Features",
+    path: "/future-features",
+    icon: Lightbulb,
+  },
 ];
 
 export function pathToNavId(pathname: string): NavId {
@@ -46,6 +58,12 @@ export function pathToNavId(pathname: string): NavId {
   }
   if (pathname === "/temperature" || pathname.startsWith("/temperature/")) {
     return "temperature";
+  }
+  if (
+    pathname === "/future-features" ||
+    pathname.startsWith("/future-features/")
+  ) {
+    return "future-features";
   }
   return "overview";
 }

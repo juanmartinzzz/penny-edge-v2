@@ -13,6 +13,10 @@ import {
 } from "../lib/analysis";
 import { getTemperature, type TemperatureOverview } from "../lib/temperature";
 import { listScanners, type Scanner } from "../lib/scanners";
+import {
+  getFutureFeatureCounts,
+  type FutureFeatureCounts,
+} from "../lib/futureFeatures";
 import { PRODUCT_NAMES } from "../lib/productNames";
 import { formatDateTime } from "../lib/dates";
 import "./HomePage.css";
@@ -30,6 +34,7 @@ type OverviewBundle = {
   temperature: TemperatureOverview;
   symbols: AnalysisSymbol[];
   auth: AuthStatus | null;
+  futureFeatures: FutureFeatureCounts;
 };
 
 function formatNumber(value: number | null | undefined, digits = 2): string {
@@ -54,13 +59,19 @@ export function HomePage() {
   const [authBusy, setAuthBusy] = useState(false);
 
   async function loadOverview() {
-    const [scannersRes, analysis, temperature, symbolsRes, auth] = await Promise.all([
-      listScanners(),
-      getAnalysis(),
-      getTemperature(),
-      getAnalysisSymbols(),
-      apiFetch<AuthStatus>("/market/auth/status").catch(() => null),
-    ]);
+    const [scannersRes, analysis, temperature, symbolsRes, auth, futureFeatures] =
+      await Promise.all([
+        listScanners(),
+        getAnalysis(),
+        getTemperature(),
+        getAnalysisSymbols(),
+        apiFetch<AuthStatus>("/market/auth/status").catch(() => null),
+        getFutureFeatureCounts().catch(() => ({
+          ready: 0,
+          idea: 0,
+          inProgress: 0,
+        })),
+      ]);
 
     setData({
       scanners: scannersRes.scanners,
@@ -68,6 +79,7 @@ export function HomePage() {
       temperature,
       symbols: symbolsRes.symbols,
       auth,
+      futureFeatures,
     });
     setError(null);
   }
@@ -297,6 +309,37 @@ export function HomePage() {
                   {authBusy ? "Refreshing…" : "Refresh auth"}
                 </Button>
               </div>
+            </article>
+
+            <article className="home-pipe">
+              <div className="home-pipe-top">
+                <strong>Future Features</strong>
+                <span
+                  className={`home-pill tone-${
+                    data.futureFeatures.ready > 0
+                      ? "ok"
+                      : data.futureFeatures.inProgress > 0
+                        ? "run"
+                        : "idle"
+                  }`}
+                >
+                  {data.futureFeatures.ready > 0
+                    ? "Ready"
+                    : data.futureFeatures.inProgress > 0
+                      ? "In progress"
+                      : "Idle"}
+                </span>
+              </div>
+              <p className="home-pipe-metric">
+                <em>{data.futureFeatures.ready}</em> ready ·{" "}
+                {data.futureFeatures.idea} ideas
+              </p>
+              <p className="home-pipe-meta">
+                {data.futureFeatures.inProgress} in progress
+              </p>
+              <Link className="home-pipe-link" to="/future-features">
+                Open backlog <ArrowRight size={14} strokeWidth={2.5} />
+              </Link>
             </article>
           </section>
 

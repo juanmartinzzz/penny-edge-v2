@@ -36,8 +36,19 @@ import {
   type TemperatureEnv,
 } from "./temperature/service";
 import type { TemperatureJobMessage, TemperatureParams } from "./temperature/types";
+import {
+  createFeature,
+  getFeature,
+  getFeaturesOverviewCounts,
+  listFeatureTypes,
+  listFeatures,
+  patchFeature,
+  removeFeature,
+  type FutureFeatureInput,
+  type FutureFeaturesEnv,
+} from "./future-features/service";
 
-type AppBindings = ScannerEnv & AnalysisEnv & TemperatureEnv;
+type AppBindings = ScannerEnv & AnalysisEnv & TemperatureEnv & FutureFeaturesEnv;
 
 type AppEnv = {
   Bindings: AppBindings;
@@ -96,6 +107,10 @@ app.get("/", (c) =>
       "/temperature/symbols",
       "/temperature/run",
       "/temperature/runs/:runId",
+      "/future-features",
+      "/future-features/types",
+      "/future-features/counts",
+      "/future-features/:id",
     ],
   }),
 );
@@ -330,6 +345,70 @@ app.post("/temperature/run", async (c) => {
       409,
     );
   }
+});
+
+app.get("/future-features/types", async (c) => {
+  const result = await listFeatureTypes(c.env);
+  return c.json(result);
+});
+
+app.get("/future-features/counts", async (c) => {
+  const counts = await getFeaturesOverviewCounts(c.env);
+  return c.json(counts);
+});
+
+app.get("/future-features", async (c) => {
+  try {
+    const status = c.req.query("status") ?? undefined;
+    const type = c.req.query("type") ?? undefined;
+    const q = c.req.query("q") ?? undefined;
+    const result = await listFeatures(c.env, { status, type, q });
+    return c.json(result);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : "Failed to list future features" },
+      400,
+    );
+  }
+});
+
+app.get("/future-features/:id", async (c) => {
+  const result = await getFeature(c.env, c.req.param("id"));
+  if (!result) return c.json({ error: "Future feature not found" }, 404);
+  return c.json(result);
+});
+
+app.post("/future-features", async (c) => {
+  try {
+    const body = await c.req.json<FutureFeatureInput>();
+    const result = await createFeature(c.env, body);
+    return c.json(result, 201);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : "Failed to create future feature" },
+      400,
+    );
+  }
+});
+
+app.patch("/future-features/:id", async (c) => {
+  try {
+    const body = await c.req.json<FutureFeatureInput>();
+    const result = await patchFeature(c.env, c.req.param("id"), body);
+    if (!result) return c.json({ error: "Future feature not found" }, 404);
+    return c.json(result);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : "Failed to update future feature" },
+      400,
+    );
+  }
+});
+
+app.delete("/future-features/:id", async (c) => {
+  const ok = await removeFeature(c.env, c.req.param("id"));
+  if (!ok) return c.json({ error: "Future feature not found" }, 404);
+  return c.json({ ok: true });
 });
 
 app.onError((error, c) => {
