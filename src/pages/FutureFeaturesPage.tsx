@@ -401,6 +401,16 @@ export function FutureFeaturesPage() {
     }
   }
 
+  const orderedFeatures = useMemo(() => {
+    const open: FutureFeature[] = [];
+    const done: FutureFeature[] = [];
+    for (const feature of features) {
+      if (feature.status === "done") done.push(feature);
+      else open.push(feature);
+    }
+    return [...open, ...done];
+  }, [features]);
+
   const showEmpty = !loading && features.length === 0 && !creating;
   const showList = !loading && (features.length > 0 || creating);
 
@@ -482,8 +492,9 @@ export function FutureFeaturesPage() {
             </li>
           ) : null}
 
-          {features.map((feature) => {
+          {orderedFeatures.map((feature) => {
             const active = editingId === feature.id;
+            const collapsed = feature.status === "done";
 
             if (active) {
               return (
@@ -503,7 +514,10 @@ export function FutureFeaturesPage() {
             }
 
             return (
-              <li key={feature.id} className="ff-item">
+              <li
+                key={feature.id}
+                className={`ff-item${collapsed ? " is-collapsed" : ""}`}
+              >
                 <div className="ff-item-topline">
                   <span className="ff-topline-cell">
                     <span className="ff-type">{feature.typeLabel}</span>
@@ -583,68 +597,70 @@ export function FutureFeaturesPage() {
                     </div>
                   </button>
 
-                  <div className="ff-item-detail">
-                    {feature.body ? (
-                      <section className="ff-detail-block">
-                        <h3>Body</h3>
-                        <div className="ff-body-grid">
-                          {bodyParagraphs(feature.body).map((paragraph, index) => (
-                            <article
-                              key={`${feature.id}-p-${index}`}
-                              className="ff-body-card"
-                            >
-                              <p>{paragraph}</p>
-                            </article>
-                          ))}
-                        </div>
-                      </section>
-                    ) : null}
-
-                    {feature.tags.length > 0 ? (
-                      <section className="ff-detail-block">
-                        <h3>Tags</h3>
-                        <div className="ff-tag-list">
-                          {feature.tags.map((tag) => (
-                            <span key={tag} className="ff-tag">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </section>
-                    ) : null}
-
-                    {feature.executionNotes ? (
-                      <section className="ff-detail-block">
-                        <h3>Execution notes</h3>
-                        <div className="ff-body-grid">
-                          {bodyParagraphs(feature.executionNotes).map(
-                            (paragraph, index) => (
+                  {!collapsed ? (
+                    <div className="ff-item-detail">
+                      {feature.body ? (
+                        <section className="ff-detail-block">
+                          <h3>Body</h3>
+                          <div className="ff-body-grid">
+                            {bodyParagraphs(feature.body).map((paragraph, index) => (
                               <article
-                                key={`${feature.id}-en-${index}`}
+                                key={`${feature.id}-p-${index}`}
                                 className="ff-body-card"
                               >
                                 <p>{paragraph}</p>
                               </article>
-                            ),
-                          )}
-                        </div>
-                      </section>
-                    ) : null}
+                            ))}
+                          </div>
+                        </section>
+                      ) : null}
 
-                    {feature.payloadJson ? (
-                      <section className="ff-detail-block">
-                        <h3>Payload JSON</h3>
-                        <pre className="ff-detail-payload">{feature.payloadJson}</pre>
-                      </section>
-                    ) : null}
+                      {feature.tags.length > 0 ? (
+                        <section className="ff-detail-block">
+                          <h3>Tags</h3>
+                          <div className="ff-tag-list">
+                            {feature.tags.map((tag) => (
+                              <span key={tag} className="ff-tag">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        </section>
+                      ) : null}
 
-                    {!feature.body &&
-                    feature.tags.length === 0 &&
-                    !feature.executionNotes &&
-                    !feature.payloadJson ? (
-                      <p className="ff-detail-empty">No details yet — click to edit.</p>
-                    ) : null}
-                  </div>
+                      {feature.executionNotes ? (
+                        <section className="ff-detail-block">
+                          <h3>Execution notes</h3>
+                          <div className="ff-body-grid">
+                            {bodyParagraphs(feature.executionNotes).map(
+                              (paragraph, index) => (
+                                <article
+                                  key={`${feature.id}-en-${index}`}
+                                  className="ff-body-card"
+                                >
+                                  <p>{paragraph}</p>
+                                </article>
+                              ),
+                            )}
+                          </div>
+                        </section>
+                      ) : null}
+
+                      {feature.payloadJson ? (
+                        <section className="ff-detail-block">
+                          <h3>Payload JSON</h3>
+                          <pre className="ff-detail-payload">{feature.payloadJson}</pre>
+                        </section>
+                      ) : null}
+
+                      {!feature.body &&
+                      feature.tags.length === 0 &&
+                      !feature.executionNotes &&
+                      !feature.payloadJson ? (
+                        <p className="ff-detail-empty">No details yet — click to edit.</p>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </li>
             );

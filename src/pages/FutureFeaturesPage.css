@@ -165,6 +165,10 @@
   border-color: var(--border-strong);
 }
 
+.ff-item.is-collapsed .ff-item-header {
+  padding-bottom: 0.75rem;
+}
+
 .ff-item.is-editing .ff-editor {
   border: 0;
   border-radius: 0;
