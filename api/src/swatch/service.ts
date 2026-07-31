@@ -379,13 +379,13 @@ async function executeSwatchRun(env: SwatchEnv, runId: string): Promise<void> {
           { symbol: asset.symbol, exchange: asset.exchange },
           { interval: "1h", range },
         );
-        const move = evaluateCloseToClose(
-          chart.bars,
-          asset.window_hours,
-          nowMs,
-        );
+        const move = evaluateCloseToClose(chart.bars, asset.window_hours);
         if (!move) {
-          throw new Error("Not enough hourly closes for the window");
+          throw new Error(
+            chart.bars.length < 2
+              ? `Yahoo returned ${chart.bars.length} hourly bar(s) — need at least 2 closes`
+              : "Could not span the window with available hourly closes",
+          );
         }
 
         const breached = moveBreachesThreshold(

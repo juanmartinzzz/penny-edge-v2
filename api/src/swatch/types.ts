@@ -101,12 +101,17 @@ export function isSwatchDirection(value: string): value is SwatchDirection {
 
 /**
  * Close-to-close % move over `windowHours`.
- * Start = last hourly close at or before (now − window); end = latest hourly close.
+ *
+ * End = latest hourly close we have.
+ * Start = last hourly close at or before (end − window).
+ *
+ * The window is anchored on the latest bar — not wall-clock "now" — so
+ * after-hours / weekends still compare two real prints instead of failing
+ * when every bar falls before (now − window).
  */
 export function evaluateCloseToClose(
   bars: Bar[],
   windowHours: number,
-  nowMs: number = Date.now(),
 ): CloseToCloseMove | null {
   const valid = bars.filter(
     (bar) =>
@@ -117,14 +122,14 @@ export function evaluateCloseToClose(
   if (valid.length < 2) return null;
   if (!Number.isFinite(windowHours) || windowHours <= 0) return null;
 
-  const cutoffSec = (nowMs - windowHours * 3600_000) / 1000;
+  const end = valid[valid.length - 1]!;
+  const cutoffSec = end.time - windowHours * 3600;
   let start = valid[0]!;
   for (const bar of valid) {
     if (bar.time <= cutoffSec) start = bar;
     else break;
   }
 
-  const end = valid[valid.length - 1]!;
   if (start.time >= end.time) return null;
 
   const movePct = ((end.close - start.close) / start.close) * 100;

@@ -331,7 +331,8 @@ export function SwatchPage() {
       return data.config.lastRunError ?? "Last run failed";
     }
     if (data.config.lastRunAt) {
-      return `Last run ${formatDateTime(data.config.lastRunAt)} · ${data.config.lastRunOk ?? 0} ok · ${data.config.lastRunAlerted ?? 0} alerted`;
+      const failed = data.config.lastRunFailed ?? 0;
+      return `Last run ${formatDateTime(data.config.lastRunAt)} · ${data.config.lastRunOk ?? 0} ok · ${failed} failed · ${data.config.lastRunAlerted ?? 0} alerted`;
     }
     return "Never run";
   }
