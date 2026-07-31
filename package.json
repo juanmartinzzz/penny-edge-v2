@@ -16,6 +16,7 @@
     "db:migrate:local": "wrangler d1 migrations apply penny-edge-db --local -c api/wrangler.jsonc",
     "db:migrate:remote": "wrangler d1 migrations apply penny-edge-db --remote -c api/wrangler.jsonc",
     "features:ready": "node scripts/list-ready-future-features.mjs",
+    "features:search": "node scripts/search-future-features.mjs",
     "repos:update": "for d in repos/*/; do [ -d \"$d/.git\" ] && git -C \"$d\" pull --ff-only; done"
   },
   "dependencies": {
