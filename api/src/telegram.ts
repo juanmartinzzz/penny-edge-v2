@@ -74,3 +74,27 @@ export function formatCobutaAlert(
 
   return `COBUTA\n${links.join("  ")}`;
 }
+
+export type SwatchAlertLine = {
+  symbol: string;
+  exchange: string;
+  movePct: number;
+  windowHours: number;
+  thresholdPct: number;
+};
+
+/** SWATCH (Sell Watch) variation ping — one line per asset. */
+export function formatSwatchAlert(lines: SwatchAlertLine[]): string {
+  const body = lines.map((row) => {
+    const href = generateTradingViewUrl({
+      symbol: row.symbol,
+      exchange: row.exchange,
+    });
+    const label = escapeHtml(row.symbol);
+    const sign = row.movePct > 0 ? "+" : "";
+    const move = `${sign}${row.movePct.toFixed(1)}%`;
+    return `<a href="${href}">${label}</a> ${escapeHtml(move)} in ${row.windowHours}h (thr ${row.thresholdPct}%)`;
+  });
+
+  return `SWATCH\n${body.join("\n")}`;
+}

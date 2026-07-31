@@ -13,6 +13,7 @@ import {
   type AnalysisSymbol,
 } from "../lib/analysis";
 import { getTemperature, type TemperatureOverview } from "../lib/temperature";
+import { getSwatch, type SwatchOverview } from "../lib/swatch";
 import { listScanners, type Scanner } from "../lib/scanners";
 import {
   getFutureFeatureCounts,
@@ -44,6 +45,7 @@ const KIND_FILTER_OPTIONS = [
   { value: "evg", label: `EVG · ${PRODUCT_NAMES.EVG}` },
   { value: "tas", label: `TAS · ${PRODUCT_NAMES.TAS}` },
   { value: "his", label: `HIS · ${PRODUCT_NAMES.HIS}` },
+  { value: "swatch", label: `SWATCH · ${PRODUCT_NAMES.SWATCH}` },
 ];
 
 const STATUS_FILTER_OPTIONS = [
@@ -65,6 +67,7 @@ type OverviewBundle = {
   scanners: Scanner[];
   analysis: AnalysisOverview;
   temperature: TemperatureOverview;
+  swatch: SwatchOverview;
   symbols: AnalysisSymbol[];
   auth: AuthStatus | null;
   futureFeatures: FutureFeatureCounts;
@@ -126,24 +129,33 @@ export function HomePage() {
   const [jobError, setJobError] = useState<string | null>(null);
 
   async function loadOverview() {
-    const [scannersRes, analysis, temperature, symbolsRes, auth, futureFeatures] =
-      await Promise.all([
-        listScanners(),
-        getAnalysis(),
-        getTemperature(),
-        getAnalysisSymbols(),
-        apiFetch<AuthStatus>("/market/auth/status").catch(() => null),
-        getFutureFeatureCounts().catch(() => ({
-          ready: 0,
-          idea: 0,
-          inProgress: 0,
-        })),
-      ]);
+    const [
+      scannersRes,
+      analysis,
+      temperature,
+      swatch,
+      symbolsRes,
+      auth,
+      futureFeatures,
+    ] = await Promise.all([
+      listScanners(),
+      getAnalysis(),
+      getTemperature(),
+      getSwatch(),
+      getAnalysisSymbols(),
+      apiFetch<AuthStatus>("/market/auth/status").catch(() => null),
+      getFutureFeatureCounts().catch(() => ({
+        ready: 0,
+        idea: 0,
+        inProgress: 0,
+      })),
+    ]);
 
     setData({
       scanners: scannersRes.scanners,
       analysis,
       temperature,
+      swatch,
       symbols: symbolsRes.symbols,
       auth,
       futureFeatures,
@@ -242,6 +254,9 @@ export function HomePage() {
     const hisRunning =
       data.temperature.activeRun?.status === "queued" ||
       data.temperature.activeRun?.status === "running";
+    const swatchRunning =
+      data.swatch.activeRun?.status === "queued" ||
+      data.swatch.activeRun?.status === "running";
 
     return {
       enabledEvgCount: enabledEvg.length,
@@ -255,6 +270,7 @@ export function HomePage() {
       evgRunning,
       tasRunning,
       hisRunning,
+      swatchRunning,
     };
   }, [data]);
 
@@ -272,9 +288,11 @@ export function HomePage() {
         <p>
           Pipeline health for{" "}
           <AcronymLabel acronym="EVG" layout="inline" />,{" "}
-          <AcronymLabel acronym="TAS" layout="inline" />, and{" "}
-          <AcronymLabel acronym="HIS" layout="inline" /> — what’s gated, analyzed,
-          and how hot the crash scores are.
+          <AcronymLabel acronym="TAS" layout="inline" />,{" "}
+          <AcronymLabel acronym="HIS" layout="inline" />, and{" "}
+          <AcronymLabel acronym="SWATCH" layout="inline" /> — what’s gated,
+          analyzed, how hot the crash scores are, and what you’re watching to
+          sell.
         </p>
       </header>
 
@@ -364,6 +382,34 @@ export function HomePage() {
 
             <article className="home-pipe">
               <div className="home-pipe-top">
+                <AcronymLabel acronym="SWATCH" />
+                <span
+                  className={`home-pill tone-${derived.swatchRunning ? "run" : data.swatch.config.enabled ? "ok" : "idle"}`}
+                >
+                  {derived.swatchRunning
+                    ? "Running"
+                    : data.swatch.config.enabled
+                      ? "On"
+                      : "Off"}
+                </span>
+              </div>
+              <p className="home-pipe-metric">
+                <em>
+                  {data.swatch.enabledCount}/{data.swatch.assetCount}
+                </em>{" "}
+                watching
+              </p>
+              <p className="home-pipe-meta">
+                Next {formatDateTime(data.swatch.config.nextRunAt)}
+              </p>
+              <Link className="home-pipe-link" to="/swatch">
+                Open {PRODUCT_NAMES.SWATCH}{" "}
+                <ArrowRight size={14} strokeWidth={2.5} />
+              </Link>
+            </article>
+
+            <article className="home-pipe">
+              <div className="home-pipe-top">
                 <strong>Signals</strong>
                 <span
                   className={`home-pill tone-${
@@ -444,8 +490,9 @@ export function HomePage() {
                 <p className="home-runs-sub">
                   When{" "}
                   <AcronymLabel acronym="EVG" layout="inline" />,{" "}
-                  <AcronymLabel acronym="TAS" layout="inline" />, and{" "}
-                  <AcronymLabel acronym="HIS" layout="inline" /> jobs actually
+                  <AcronymLabel acronym="TAS" layout="inline" />,{" "}
+                  <AcronymLabel acronym="HIS" layout="inline" />, and{" "}
+                  <AcronymLabel acronym="SWATCH" layout="inline" /> jobs actually
                   started — newest first.
                 </p>
               </div>
@@ -523,8 +570,13 @@ export function HomePage() {
                                   </>
                                 ) : run.kind === "tas" ? (
                                   <AcronymLabel acronym="TAS" layout="inline" />
-                                ) : (
+                                ) : run.kind === "his" ? (
                                   <AcronymLabel acronym="HIS" layout="inline" />
+                                ) : (
+                                  <AcronymLabel
+                                    acronym="SWATCH"
+                                    layout="inline"
+                                  />
                                 )}
                                 <span
                                   className={`home-run-status tone-${statusTone(run.status)}`}

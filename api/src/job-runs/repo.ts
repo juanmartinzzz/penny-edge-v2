@@ -75,6 +75,29 @@ const UNION_SQL = `
     finished_at,
     created_at
   FROM temperature_runs
+
+  UNION ALL
+
+  SELECT
+    id,
+    'swatch' AS kind,
+    'swatch' AS slug,
+    NULL AS exchange_code,
+    NULL AS exchange_label,
+    NULL AS scanner_id,
+    status,
+    trigger,
+    0 AS offset,
+    0 AS page_size,
+    scanned,
+    NULL AS matched,
+    succeeded,
+    failed,
+    error,
+    started_at,
+    finished_at,
+    created_at
+  FROM swatch_runs
 `;
 
 export async function listJobRuns(

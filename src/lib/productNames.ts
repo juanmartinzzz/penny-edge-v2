@@ -4,6 +4,7 @@ export const PRODUCT_NAMES = {
   TAS: "Trend Analysis for Symbols",
   HIS: "Heat and Interest Scale",
   COBUTA: "Consider Buying These Assets",
+  SWATCH: "Sell Watch",
 } as const;
 
 export type ProductAcronym = keyof typeof PRODUCT_NAMES;

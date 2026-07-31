@@ -51,12 +51,24 @@ import {
   listJobRunsOverview,
   type JobRunsEnv,
 } from "./job-runs/service";
+import {
+  createAsset as createSwatchAsset,
+  getSwatchOverview,
+  getSwatchRunStatus,
+  patchAsset as patchSwatchAsset,
+  patchSwatchConfig,
+  processDueSwatch,
+  removeAsset as removeSwatchAsset,
+  startSwatchRun,
+  type SwatchEnv,
+} from "./swatch/service";
 
 type AppBindings = ScannerEnv &
   AnalysisEnv &
   TemperatureEnv &
   FutureFeaturesEnv &
-  JobRunsEnv;
+  JobRunsEnv &
+  SwatchEnv;
 
 type AppEnv = {
   Bindings: AppBindings;
@@ -115,6 +127,11 @@ app.get("/", (c) =>
       "/temperature/symbols",
       "/temperature/run",
       "/temperature/runs/:runId",
+      "/swatch",
+      "/swatch/assets",
+      "/swatch/assets/:id",
+      "/swatch/run",
+      "/swatch/runs/:runId",
       "/future-features",
       "/future-features/types",
       "/future-features/counts",
@@ -373,6 +390,121 @@ app.post("/temperature/run", async (c) => {
   }
 });
 
+app.get("/swatch", async (c) => {
+  try {
+    const overview = await getSwatchOverview(c.env);
+    return c.json(overview);
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to load SWATCH",
+      },
+      500,
+    );
+  }
+});
+
+app.patch("/swatch", async (c) => {
+  try {
+    const body = await c.req.json<{
+      enabled?: boolean;
+      intervalHours?: number;
+    }>();
+    const overview = await patchSwatchConfig(c.env, body);
+    if (!overview) return c.json({ error: "SWATCH config not found" }, 404);
+    return c.json(overview);
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to update SWATCH",
+      },
+      400,
+    );
+  }
+});
+
+app.post("/swatch/assets", async (c) => {
+  try {
+    const body = await c.req.json<{
+      symbol?: string;
+      exchange?: string;
+      enabled?: boolean;
+      thresholdPct?: number;
+      windowHours?: number;
+      direction?: string;
+      cooldownMinutes?: number;
+    }>();
+    const result = await createSwatchAsset(c.env, body);
+    return c.json(result, 201);
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create SWATCH asset",
+      },
+      400,
+    );
+  }
+});
+
+app.patch("/swatch/assets/:id", async (c) => {
+  try {
+    const body = await c.req.json<{
+      enabled?: boolean;
+      thresholdPct?: number;
+      windowHours?: number;
+      direction?: string;
+      cooldownMinutes?: number;
+    }>();
+    const result = await patchSwatchAsset(c.env, c.req.param("id"), body);
+    if (!result) return c.json({ error: "SWATCH asset not found" }, 404);
+    return c.json(result);
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to update SWATCH asset",
+      },
+      400,
+    );
+  }
+});
+
+app.delete("/swatch/assets/:id", async (c) => {
+  const ok = await removeSwatchAsset(c.env, c.req.param("id"));
+  if (!ok) return c.json({ error: "SWATCH asset not found" }, 404);
+  return c.json({ ok: true });
+});
+
+app.get("/swatch/runs/:runId", async (c) => {
+  const run = await getSwatchRunStatus(c.env, c.req.param("runId"));
+  if (!run) return c.json({ error: "Run not found" }, 404);
+  return c.json({ run });
+});
+
+app.post("/swatch/run", async (c) => {
+  try {
+    const run = await startSwatchRun(c.env, "manual");
+    return c.json({ run }, 202);
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to start SWATCH run",
+      },
+      409,
+    );
+  }
+});
+
 app.get("/future-features/types", async (c) => {
   const result = await listFeatureTypes(c.env);
   return c.json(result);
@@ -484,6 +616,9 @@ export default {
         }),
         processDueTemperature(env).then((started) => {
           console.log(`Cron started ${started} HIS run(s)`);
+        }),
+        processDueSwatch(env).then((started) => {
+          console.log(`Cron started ${started} SWATCH run(s)`);
         }),
       ]),
     );
