@@ -524,119 +524,126 @@ export function FutureFeaturesPage() {
                       Executed {formatDateTime(feature.executedAt)}
                     </span>
                   ) : null}
-                </div>
-
-                <div className="ff-item-body">
-                  <div className="ff-item-main">
-                    <button
-                      type="button"
-                      className="ff-item-header"
-                      onClick={() => openEdit(feature)}
-                    >
-                      <div className="ff-item-title-row">
-                        <strong>{feature.title}</strong>
-                      </div>
-                    </button>
-
-                    <div className="ff-item-detail">
-                      {feature.body ? (
-                        <section className="ff-detail-block">
-                          <h3>Body</h3>
-                          <div className="ff-body-grid">
-                            {bodyParagraphs(feature.body).map((paragraph, index) => (
-                              <article
-                                key={`${feature.id}-p-${index}`}
-                                className="ff-body-card"
-                              >
-                                <p>{paragraph}</p>
-                              </article>
-                            ))}
-                          </div>
-                        </section>
-                      ) : null}
-
-                      {feature.tags.length > 0 ? (
-                        <section className="ff-detail-block">
-                          <h3>Tags</h3>
-                          <div className="ff-tag-list">
-                            {feature.tags.map((tag) => (
-                              <span key={tag} className="ff-tag">
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
-                        </section>
-                      ) : null}
-
-                      {feature.executionNotes ? (
-                        <section className="ff-detail-block">
-                          <h3>Execution notes</h3>
-                          <div className="ff-body-grid">
-                            {bodyParagraphs(feature.executionNotes).map(
-                              (paragraph, index) => (
-                                <article
-                                  key={`${feature.id}-en-${index}`}
-                                  className="ff-body-card"
-                                >
-                                  <p>{paragraph}</p>
-                                </article>
-                              ),
-                            )}
-                          </div>
-                        </section>
-                      ) : null}
-
-                      {feature.payloadJson ? (
-                        <section className="ff-detail-block">
-                          <h3>Payload JSON</h3>
-                          <pre className="ff-detail-payload">{feature.payloadJson}</pre>
-                        </section>
-                      ) : null}
-
-                      {!feature.body &&
-                      feature.tags.length === 0 &&
-                      !feature.executionNotes &&
-                      !feature.payloadJson ? (
-                        <p className="ff-detail-empty">No details yet — click to edit.</p>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div className="ff-item-actions">
+                  <span className="ff-topline-cell">
                     <Button
                       variant="ghost"
+                      className="ff-topline-btn"
                       disabled={busy || creating}
                       onClick={() => openEdit(feature)}
                     >
                       Edit
                     </Button>
-                    {feature.status !== "ready" ? (
+                  </span>
+                  {feature.status !== "ready" ? (
+                    <span className="ff-topline-cell">
                       <Button
                         variant="ghost"
+                        className="ff-topline-btn"
                         disabled={busy || creating}
                         onClick={() => handleQuickStatus(feature, "ready")}
                       >
                         Ready
                       </Button>
-                    ) : null}
-                    {feature.status !== "done" ? (
+                    </span>
+                  ) : null}
+                  {feature.status !== "done" ? (
+                    <span className="ff-topline-cell">
                       <Button
                         variant="ghost"
+                        className="ff-topline-btn"
                         disabled={busy || creating}
                         onClick={() => handleQuickStatus(feature, "done")}
                       >
                         Done
                       </Button>
-                    ) : null}
+                    </span>
+                  ) : null}
+                  <span className="ff-topline-cell">
                     <Button
                       variant="ghost"
                       iconOnly
-                      aria-label="Delete"
+                      className="ff-topline-btn"
+                      aria-label="Remove"
                       disabled={busy || creating}
                       onClick={() => handleDelete(feature.id)}
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={14} />
                     </Button>
+                  </span>
+                </div>
+
+                <div className="ff-item-main">
+                  <button
+                    type="button"
+                    className="ff-item-header"
+                    onClick={() => openEdit(feature)}
+                  >
+                    <div className="ff-item-title-row">
+                      <strong>{feature.title}</strong>
+                    </div>
+                  </button>
+
+                  <div className="ff-item-detail">
+                    {feature.body ? (
+                      <section className="ff-detail-block">
+                        <h3>Body</h3>
+                        <div className="ff-body-grid">
+                          {bodyParagraphs(feature.body).map((paragraph, index) => (
+                            <article
+                              key={`${feature.id}-p-${index}`}
+                              className="ff-body-card"
+                            >
+                              <p>{paragraph}</p>
+                            </article>
+                          ))}
+                        </div>
+                      </section>
+                    ) : null}
+
+                    {feature.tags.length > 0 ? (
+                      <section className="ff-detail-block">
+                        <h3>Tags</h3>
+                        <div className="ff-tag-list">
+                          {feature.tags.map((tag) => (
+                            <span key={tag} className="ff-tag">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </section>
+                    ) : null}
+
+                    {feature.executionNotes ? (
+                      <section className="ff-detail-block">
+                        <h3>Execution notes</h3>
+                        <div className="ff-body-grid">
+                          {bodyParagraphs(feature.executionNotes).map(
+                            (paragraph, index) => (
+                              <article
+                                key={`${feature.id}-en-${index}`}
+                                className="ff-body-card"
+                              >
+                                <p>{paragraph}</p>
+                              </article>
+                            ),
+                          )}
+                        </div>
+                      </section>
+                    ) : null}
+
+                    {feature.payloadJson ? (
+                      <section className="ff-detail-block">
+                        <h3>Payload JSON</h3>
+                        <pre className="ff-detail-payload">{feature.payloadJson}</pre>
+                      </section>
+                    ) : null}
+
+                    {!feature.body &&
+                    feature.tags.length === 0 &&
+                    !feature.executionNotes &&
+                    !feature.payloadJson ? (
+                      <p className="ff-detail-empty">No details yet — click to edit.</p>
+                    ) : null}
                   </div>
                 </div>
               </li>
