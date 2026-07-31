@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { Button } from "../components/interaction/Button";
+import { PillSelect } from "../components/interaction/PillSelect";
 import { AcronymLabel } from "../components/AcronymLabel";
 import { apiFetch } from "../lib/api";
 import {
@@ -17,9 +18,41 @@ import {
   getFutureFeatureCounts,
   type FutureFeatureCounts,
 } from "../lib/futureFeatures";
+import {
+  formatJobRunDetail,
+  formatJobRunError,
+  listJobRuns,
+  type JobRun,
+  type JobRunKind,
+  type JobRunStatus,
+} from "../lib/jobRuns";
 import { PRODUCT_NAMES } from "../lib/productNames";
-import { formatDateTime } from "../lib/dates";
+import {
+  dayKey,
+  formatDateTime,
+  formatDayLabel,
+  formatDuration,
+  formatRelativeTime,
+  formatTime,
+} from "../lib/dates";
 import "./HomePage.css";
+
+const JOB_RUN_PAGE_SIZE = 15;
+
+const KIND_FILTER_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "evg", label: `EVG · ${PRODUCT_NAMES.EVG}` },
+  { value: "tas", label: `TAS · ${PRODUCT_NAMES.TAS}` },
+  { value: "his", label: `HIS · ${PRODUCT_NAMES.HIS}` },
+];
+
+const STATUS_FILTER_OPTIONS = [
+  { value: "all", label: "All statuses" },
+  { value: "ok", label: "Ok" },
+  { value: "error", label: "Error" },
+  { value: "running", label: "Running" },
+  { value: "queued", label: "Queued" },
+];
 
 type AuthStatus = {
   provider: string;
@@ -52,11 +85,45 @@ function statusTone(status: string | null | undefined): "ok" | "error" | "idle" 
   return "idle";
 }
 
+function runMoment(run: JobRun): string {
+  return run.startedAt ?? run.createdAt;
+}
+
+function groupRunsByDay(runs: JobRun[]): { key: string; label: string; runs: JobRun[] }[] {
+  const groups: { key: string; label: string; runs: JobRun[] }[] = [];
+  const now = new Date();
+
+  for (const run of runs) {
+    const key = dayKey(runMoment(run)) ?? "unknown";
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) {
+      last.runs.push(run);
+      continue;
+    }
+    groups.push({
+      key,
+      label: formatDayLabel(runMoment(run), now),
+      runs: [run],
+    });
+  }
+
+  return groups;
+}
+
 export function HomePage() {
   const [data, setData] = useState<OverviewBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authBusy, setAuthBusy] = useState(false);
+
+  const [jobKind, setJobKind] = useState<"all" | JobRunKind>("all");
+  const [jobStatus, setJobStatus] = useState<"all" | JobRunStatus>("all");
+  const [jobOffset, setJobOffset] = useState(0);
+  const [jobRuns, setJobRuns] = useState<JobRun[]>([]);
+  const [jobTotal, setJobTotal] = useState(0);
+  const [jobHasMore, setJobHasMore] = useState(false);
+  const [jobLoading, setJobLoading] = useState(true);
+  const [jobError, setJobError] = useState<string | null>(null);
 
   async function loadOverview() {
     const [scannersRes, analysis, temperature, symbolsRes, auth, futureFeatures] =
@@ -84,6 +151,27 @@ export function HomePage() {
     setError(null);
   }
 
+  async function loadJobRuns(offset: number, kind: "all" | JobRunKind, status: "all" | JobRunStatus) {
+    setJobLoading(true);
+    try {
+      const page = await listJobRuns({
+        kind,
+        status,
+        limit: JOB_RUN_PAGE_SIZE,
+        offset,
+      });
+      setJobRuns(page.runs);
+      setJobTotal(page.total);
+      setJobHasMore(page.hasMore);
+      setJobOffset(page.offset);
+      setJobError(null);
+    } catch (err) {
+      setJobError(err instanceof Error ? err.message : "Failed to load job runs");
+    } finally {
+      setJobLoading(false);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -104,6 +192,10 @@ export function HomePage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    void loadJobRuns(0, jobKind, jobStatus);
+  }, [jobKind, jobStatus]);
 
   async function handleRefreshAuth() {
     setAuthBusy(true);
@@ -165,6 +257,8 @@ export function HomePage() {
       hisRunning,
     };
   }, [data]);
+
+  const timelineGroups = useMemo(() => groupRunsByDay(jobRuns), [jobRuns]);
 
   return (
     <motion.section
@@ -344,55 +438,152 @@ export function HomePage() {
           </section>
 
           <section className="home-runs" aria-label="Recent runs">
-            <h2>Recent runs</h2>
-            <div className="home-run-list">
-              {data.scanners.map((scanner) => (
-                <div key={scanner.id} className="home-run-row">
-                  <span className="home-run-name">
-                    {scanner.code}
-                    {!scanner.enabled ? " · off" : ""}
-                  </span>
-                  <span className={`home-run-status tone-${statusTone(scanner.lastRunStatus)}`}>
-                    {scanner.lastRunStatus ?? "never"}
-                  </span>
-                  <span className="home-run-detail">
-                    {scanner.lastRunAt
-                      ? `${formatDateTime(scanner.lastRunAt)} · ${scanner.lastRunMatched ?? 0}/${scanner.lastRunScanned ?? 0}`
-                      : "—"}
-                  </span>
-                </div>
-              ))}
-              <div className="home-run-row">
-                <span className="home-run-name">
-                  <AcronymLabel acronym="TAS" layout="inline" />
-                </span>
-                <span
-                  className={`home-run-status tone-${statusTone(data.analysis.config.lastRunStatus)}`}
-                >
-                  {data.analysis.config.lastRunStatus ?? "never"}
-                </span>
-                <span className="home-run-detail">
-                  {data.analysis.config.lastRunAt
-                    ? `${formatDateTime(data.analysis.config.lastRunAt)} · ${data.analysis.config.lastRunOk ?? 0} ok · ${data.analysis.config.lastRunFailed ?? 0} failed`
-                    : "—"}
-                </span>
+            <div className="home-runs-head">
+              <div>
+                <h2>Recent runs</h2>
+                <p className="home-runs-sub">
+                  When{" "}
+                  <AcronymLabel acronym="EVG" layout="inline" />,{" "}
+                  <AcronymLabel acronym="TAS" layout="inline" />, and{" "}
+                  <AcronymLabel acronym="HIS" layout="inline" /> jobs actually
+                  started — newest first.
+                </p>
               </div>
-              <div className="home-run-row">
-                <span className="home-run-name">
-                  <AcronymLabel acronym="HIS" layout="inline" />
-                </span>
-                <span
-                  className={`home-run-status tone-${statusTone(data.temperature.config.lastRunStatus)}`}
-                >
-                  {data.temperature.config.lastRunStatus ?? "never"}
-                </span>
-                <span className="home-run-detail">
-                  {data.temperature.config.lastRunAt
-                    ? `${formatDateTime(data.temperature.config.lastRunAt)} · ${data.temperature.config.lastRunOk ?? 0} ok · ${data.temperature.config.lastRunFailed ?? 0} failed`
-                    : "—"}
-                </span>
-              </div>
+              <p className="home-runs-count">
+                {jobLoading ? "Loading…" : `${jobTotal} logged`}
+              </p>
             </div>
+
+            <div className="home-runs-filters">
+              <PillSelect
+                label="Product"
+                options={KIND_FILTER_OPTIONS}
+                value={jobKind}
+                onChange={(value) => setJobKind(value as "all" | JobRunKind)}
+                limit={4}
+              />
+              <PillSelect
+                label="Status"
+                options={STATUS_FILTER_OPTIONS}
+                value={jobStatus}
+                onChange={(value) => setJobStatus(value as "all" | JobRunStatus)}
+                limit={4}
+              />
+            </div>
+
+            {jobError ? <p className="home-error">{jobError}</p> : null}
+
+            {!jobLoading && jobRuns.length === 0 ? (
+              <p className="home-empty">No runs on this timeline yet.</p>
+            ) : (
+              <div className="home-timeline">
+                {timelineGroups.map((group) => (
+                  <div key={group.key} className="home-timeline-day">
+                    <h3 className="home-timeline-day-label">{group.label}</h3>
+                    <ol className="home-timeline-list">
+                      {group.runs.map((run) => {
+                        const moment = runMoment(run);
+                        const live =
+                          run.status === "running" || run.status === "queued";
+                        const duration = formatDuration(
+                          run.startedAt,
+                          live ? new Date() : run.finishedAt,
+                        );
+                        const errorText = formatJobRunError(run.detail.error);
+                        return (
+                          <li
+                            key={`${run.kind}-${run.id}`}
+                            className={`home-timeline-item tone-${statusTone(run.status)}${live ? " is-live" : ""}`}
+                          >
+                            <div className="home-timeline-rail" aria-hidden>
+                              <span className="home-timeline-dot" />
+                            </div>
+                            <time
+                              className="home-timeline-when"
+                              dateTime={moment}
+                              title={formatDateTime(moment)}
+                            >
+                              <span className="home-timeline-clock">
+                                {formatTime(moment)}
+                              </span>
+                              <span className="home-timeline-rel">
+                                {live ? run.status : formatRelativeTime(moment)}
+                              </span>
+                            </time>
+                            <div className="home-timeline-body">
+                              <div className="home-timeline-title">
+                                {run.kind === "evg" ? (
+                                  <>
+                                    <AcronymLabel acronym="EVG" layout="inline" />
+                                    {run.exchangeCode ? (
+                                      <span className="home-timeline-exchange">
+                                        {run.exchangeCode}
+                                      </span>
+                                    ) : null}
+                                  </>
+                                ) : run.kind === "tas" ? (
+                                  <AcronymLabel acronym="TAS" layout="inline" />
+                                ) : (
+                                  <AcronymLabel acronym="HIS" layout="inline" />
+                                )}
+                                <span
+                                  className={`home-run-status tone-${statusTone(run.status)}`}
+                                >
+                                  {run.status}
+                                </span>
+                              </div>
+                              <p className="home-timeline-meta">
+                                {run.trigger}
+                                {duration
+                                  ? ` · ${duration}${live ? " elapsed" : ""}`
+                                  : ""}
+                                {" · "}
+                                {formatJobRunDetail(run)}
+                                {run.finishedAt && !live
+                                  ? ` · done ${formatTime(run.finishedAt)}`
+                                  : ""}
+                                {errorText ? ` · ${errorText}` : ""}
+                              </p>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {jobTotal > JOB_RUN_PAGE_SIZE ? (
+              <div className="home-runs-pager">
+                <Button
+                  variant="ghost"
+                  disabled={jobLoading || jobOffset <= 0}
+                  onClick={() =>
+                    void loadJobRuns(
+                      Math.max(0, jobOffset - JOB_RUN_PAGE_SIZE),
+                      jobKind,
+                      jobStatus,
+                    )
+                  }
+                >
+                  Newer
+                </Button>
+                <span className="home-runs-page-label">
+                  {jobOffset + 1}–{Math.min(jobOffset + jobRuns.length, jobTotal)} of{" "}
+                  {jobTotal}
+                </span>
+                <Button
+                  variant="ghost"
+                  disabled={jobLoading || !jobHasMore}
+                  onClick={() =>
+                    void loadJobRuns(jobOffset + JOB_RUN_PAGE_SIZE, jobKind, jobStatus)
+                  }
+                >
+                  Older
+                </Button>
+              </div>
+            ) : null}
           </section>
 
           <section className="home-exchanges" aria-label="Exchange mix">

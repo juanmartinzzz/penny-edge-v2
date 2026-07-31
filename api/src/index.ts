@@ -47,8 +47,16 @@ import {
   type FutureFeatureInput,
   type FutureFeaturesEnv,
 } from "./future-features/service";
+import {
+  listJobRunsOverview,
+  type JobRunsEnv,
+} from "./job-runs/service";
 
-type AppBindings = ScannerEnv & AnalysisEnv & TemperatureEnv & FutureFeaturesEnv;
+type AppBindings = ScannerEnv &
+  AnalysisEnv &
+  TemperatureEnv &
+  FutureFeaturesEnv &
+  JobRunsEnv;
 
 type AppEnv = {
   Bindings: AppBindings;
@@ -111,9 +119,27 @@ app.get("/", (c) =>
       "/future-features/types",
       "/future-features/counts",
       "/future-features/:id",
+      "/job-runs",
     ],
   }),
 );
+
+app.get("/job-runs", async (c) => {
+  try {
+    const result = await listJobRunsOverview(c.env, {
+      kind: c.req.query("kind"),
+      status: c.req.query("status"),
+      limit: c.req.query("limit"),
+      offset: c.req.query("offset"),
+    });
+    return c.json(result);
+  } catch (error) {
+    return c.json(
+      { error: error instanceof Error ? error.message : "Failed to list job runs" },
+      400,
+    );
+  }
+});
 
 app.get("/market/auth/status", async (c) => {
   const market = createMarketDataService(c.env);
