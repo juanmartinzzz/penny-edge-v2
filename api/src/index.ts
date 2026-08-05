@@ -438,6 +438,10 @@ app.post("/swatch/assets", async (c) => {
       windowHours?: number;
       direction?: string;
       cooldownMinutes?: number;
+      shares?: number | null;
+      avgCost?: number | null;
+      totalInvested?: number | null;
+      atrTriggers?: Array<{ unit: string; value: number }>;
     }>();
     const result = await createSwatchAsset(c.env, body);
     return c.json(result, 201);
@@ -462,6 +466,10 @@ app.patch("/swatch/assets/:id", async (c) => {
       windowHours?: number;
       direction?: string;
       cooldownMinutes?: number;
+      shares?: number | null;
+      avgCost?: number | null;
+      totalInvested?: number | null;
+      atrTriggers?: Array<{ unit: string; value: number }>;
     }>();
     const result = await patchSwatchAsset(c.env, c.req.param("id"), body);
     if (!result) return c.json({ error: "SWATCH asset not found" }, 404);

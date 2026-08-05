@@ -145,6 +145,9 @@ export async function insertSwatchAsset(
     window_hours: number;
     direction: string;
     cooldown_minutes: number;
+    shares?: number | null;
+    avg_cost?: number | null;
+    atr_triggers_json?: string | null;
   },
 ): Promise<SwatchAssetRow> {
   const at = nowIso();
@@ -153,8 +156,9 @@ export async function insertSwatchAsset(
       `INSERT INTO swatch_assets (
          id, symbol, exchange, enabled,
          threshold_pct, window_hours, direction, cooldown_minutes,
+         shares, avg_cost, atr_triggers_json,
          created_at, updated_at
-       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       input.id,
@@ -165,6 +169,9 @@ export async function insertSwatchAsset(
       input.window_hours,
       input.direction,
       input.cooldown_minutes,
+      input.shares ?? null,
+      input.avg_cost ?? null,
+      input.atr_triggers_json ?? null,
       at,
       at,
     )
@@ -184,11 +191,17 @@ export async function updateSwatchAsset(
     window_hours?: number;
     direction?: string;
     cooldown_minutes?: number;
+    shares?: number | null;
+    avg_cost?: number | null;
+    atr_triggers_json?: string | null;
     last_checked_at?: string | null;
     last_close?: number | null;
     last_move_pct?: number | null;
+    last_atr_pnl?: number | null;
+    last_atr_pct?: number | null;
     last_alerted_at?: string | null;
     last_alert_move_pct?: number | null;
+    last_alert_kind?: string | null;
     last_error?: string | null;
   },
 ): Promise<SwatchAssetRow | null> {
@@ -204,11 +217,17 @@ export async function updateSwatchAsset(
          window_hours = ?,
          direction = ?,
          cooldown_minutes = ?,
+         shares = ?,
+         avg_cost = ?,
+         atr_triggers_json = ?,
          last_checked_at = ?,
          last_close = ?,
          last_move_pct = ?,
+         last_atr_pnl = ?,
+         last_atr_pct = ?,
          last_alerted_at = ?,
          last_alert_move_pct = ?,
+         last_alert_kind = ?,
          last_error = ?,
          updated_at = ?
        WHERE id = ?`,
@@ -219,6 +238,11 @@ export async function updateSwatchAsset(
       patch.window_hours ?? current.window_hours,
       patch.direction ?? current.direction,
       patch.cooldown_minutes ?? current.cooldown_minutes,
+      patch.shares !== undefined ? patch.shares : current.shares,
+      patch.avg_cost !== undefined ? patch.avg_cost : current.avg_cost,
+      patch.atr_triggers_json !== undefined
+        ? patch.atr_triggers_json
+        : current.atr_triggers_json,
       patch.last_checked_at !== undefined
         ? patch.last_checked_at
         : current.last_checked_at,
@@ -226,12 +250,21 @@ export async function updateSwatchAsset(
       patch.last_move_pct !== undefined
         ? patch.last_move_pct
         : current.last_move_pct,
+      patch.last_atr_pnl !== undefined
+        ? patch.last_atr_pnl
+        : current.last_atr_pnl,
+      patch.last_atr_pct !== undefined
+        ? patch.last_atr_pct
+        : current.last_atr_pct,
       patch.last_alerted_at !== undefined
         ? patch.last_alerted_at
         : current.last_alerted_at,
       patch.last_alert_move_pct !== undefined
         ? patch.last_alert_move_pct
         : current.last_alert_move_pct,
+      patch.last_alert_kind !== undefined
+        ? patch.last_alert_kind
+        : current.last_alert_kind,
       patch.last_error !== undefined ? patch.last_error : current.last_error,
       updatedAt,
       id,

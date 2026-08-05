@@ -1,6 +1,7 @@
 /**
  * SWATCH (Sell Watch) service.
  * Global schedule + per-asset close-to-close variation checks → Telegram.
+ * Optional all-time return (ATR) P&L / % triggers when shares + avg cost set.
  * Processes inline (no queue) — watchlists stay small.
  */
 import { isExchangeSessionOpen } from "../../../shared/exchangeHours";
@@ -33,11 +34,17 @@ import {
   SWATCH_FORM_DEFAULTS,
   addHours,
   chartRangeForWindow,
+  computeAtrPosition,
   evaluateCloseToClose,
+  findBreachedAtrTrigger,
   isInCooldown,
   isSwatchDirection,
   moveBreachesThreshold,
+  normalizeAtrTriggers,
   nowIso,
+  parseAtrTriggersJson,
+  serializeAtrTriggers,
+  type SwatchAtrTrigger,
   type SwatchDirection,
   type SwatchRunTrigger,
 } from "./types";
@@ -47,6 +54,13 @@ export interface SwatchEnv extends MarketEnv, TelegramEnv {}
 const EXCHANGE_VALUES = new Set<string>(
   SWATCH_EXCHANGES.map((item) => item.value),
 );
+
+type AssetPositionBody = {
+  shares?: number | null;
+  avgCost?: number | null;
+  totalInvested?: number | null;
+  atrTriggers?: unknown;
+};
 
 function serializeConfig(
   config: NonNullable<Awaited<ReturnType<typeof getSwatchConfig>>>,
@@ -89,6 +103,16 @@ function serializeRun(
 function serializeAsset(
   row: NonNullable<Awaited<ReturnType<typeof getSwatchAsset>>>,
 ) {
+  const shares = row.shares;
+  const avgCost = row.avg_cost;
+  const totalInvested =
+    shares != null &&
+    avgCost != null &&
+    Number.isFinite(shares) &&
+    Number.isFinite(avgCost)
+      ? shares * avgCost
+      : null;
+
   return {
     id: row.id,
     symbol: row.symbol,
@@ -98,11 +122,18 @@ function serializeAsset(
     windowHours: row.window_hours,
     direction: row.direction as SwatchDirection,
     cooldownMinutes: row.cooldown_minutes,
+    shares,
+    avgCost,
+    totalInvested,
+    atrTriggers: parseAtrTriggersJson(row.atr_triggers_json),
     lastCheckedAt: row.last_checked_at,
     lastClose: row.last_close,
     lastMovePct: row.last_move_pct,
+    lastAtrPnl: row.last_atr_pnl,
+    lastAtrPct: row.last_atr_pct,
     lastAlertedAt: row.last_alerted_at,
     lastAlertMovePct: row.last_alert_move_pct,
+    lastAlertKind: row.last_alert_kind,
     lastError: row.last_error,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -136,6 +167,124 @@ function assertCooldown(value: number): number {
     throw new Error("cooldownMinutes must be between 0 and 10080");
   }
   return Math.floor(value);
+}
+
+/**
+ * Resolve shares + avg cost from body.
+ * Accepts avgCost or totalInvested (total → avg = total / shares).
+ * Explicit null shares clears the ATR position.
+ */
+function resolvePositionFields(
+  body: AssetPositionBody,
+  current?: { shares: number | null; avg_cost: number | null },
+): {
+  shares?: number | null;
+  avg_cost?: number | null;
+  atr_triggers_json?: string | null;
+} {
+  const touched =
+    body.shares !== undefined ||
+    body.avgCost !== undefined ||
+    body.totalInvested !== undefined ||
+    body.atrTriggers !== undefined;
+
+  if (!touched) return {};
+
+  let atrTriggers: SwatchAtrTrigger[] | undefined;
+  if (body.atrTriggers !== undefined) {
+    atrTriggers = normalizeAtrTriggers(body.atrTriggers);
+  }
+
+  if (body.shares === null) {
+    if (atrTriggers != null && atrTriggers.length > 0) {
+      throw new Error("atrTriggers require shares and cost basis");
+    }
+    return {
+      shares: null,
+      avg_cost: null,
+      atr_triggers_json:
+        body.atrTriggers !== undefined
+          ? serializeAtrTriggers(atrTriggers ?? [])
+          : null,
+    };
+  }
+
+  if (body.avgCost !== undefined && body.totalInvested !== undefined) {
+    throw new Error("Provide avgCost or totalInvested, not both");
+  }
+
+  if (body.shares !== undefined && body.shares !== null) {
+    if (!Number.isFinite(body.shares) || body.shares <= 0) {
+      throw new Error("shares must be > 0");
+    }
+  }
+
+  const nextShares =
+    body.shares !== undefined ? body.shares : (current?.shares ?? null);
+
+  let nextAvg: number | null =
+    body.avgCost === undefined && body.totalInvested === undefined
+      ? (current?.avg_cost ?? null)
+      : null;
+
+  if (body.totalInvested !== undefined) {
+    if (body.totalInvested === null) {
+      nextAvg = null;
+    } else if (!Number.isFinite(body.totalInvested) || body.totalInvested <= 0) {
+      throw new Error("totalInvested must be > 0");
+    } else if (nextShares == null || nextShares <= 0) {
+      throw new Error("shares must be > 0 when setting totalInvested");
+    } else {
+      nextAvg = body.totalInvested / nextShares;
+    }
+  } else if (body.avgCost !== undefined) {
+    if (body.avgCost === null) {
+      nextAvg = null;
+    } else if (!Number.isFinite(body.avgCost) || body.avgCost <= 0) {
+      throw new Error("avgCost must be > 0");
+    } else {
+      nextAvg = body.avgCost;
+    }
+  }
+
+  const wantsPosition =
+    nextShares != null ||
+    nextAvg != null ||
+    (atrTriggers != null && atrTriggers.length > 0);
+
+  if (
+    wantsPosition &&
+    (nextShares == null ||
+      nextAvg == null ||
+      !Number.isFinite(nextShares) ||
+      !Number.isFinite(nextAvg) ||
+      nextShares <= 0 ||
+      nextAvg <= 0)
+  ) {
+    throw new Error(
+      "ATR needs shares > 0 and a cost basis (avgCost or totalInvested)",
+    );
+  }
+
+  const result: {
+    shares?: number | null;
+    avg_cost?: number | null;
+    atr_triggers_json?: string | null;
+  } = {};
+
+  if (
+    body.shares !== undefined ||
+    body.avgCost !== undefined ||
+    body.totalInvested !== undefined
+  ) {
+    result.shares = nextShares;
+    result.avg_cost = nextAvg;
+  }
+  if (atrTriggers !== undefined) {
+    result.atr_triggers_json = serializeAtrTriggers(atrTriggers);
+  }
+
+  return result;
 }
 
 export async function getSwatchOverview(env: SwatchEnv) {
@@ -208,7 +357,7 @@ export async function createAsset(
     windowHours?: number;
     direction?: string;
     cooldownMinutes?: number;
-  },
+  } & AssetPositionBody,
 ) {
   if (!body.symbol?.trim()) throw new Error("symbol is required");
   if (!body.exchange?.trim()) throw new Error("exchange is required");
@@ -229,6 +378,8 @@ export async function createAsset(
     throw new Error("direction must be up, down, or either");
   }
 
+  const position = resolvePositionFields(body);
+
   try {
     const row = await insertSwatchAsset(env.DB, {
       id: crypto.randomUUID(),
@@ -245,6 +396,9 @@ export async function createAsset(
       cooldown_minutes: assertCooldown(
         body.cooldownMinutes ?? SWATCH_FORM_DEFAULTS.cooldownMinutes,
       ),
+      shares: position.shares ?? null,
+      avg_cost: position.avg_cost ?? null,
+      atr_triggers_json: position.atr_triggers_json ?? null,
     });
     return { asset: serializeAsset(row) };
   } catch (error) {
@@ -265,8 +419,11 @@ export async function patchAsset(
     windowHours?: number;
     direction?: string;
     cooldownMinutes?: number;
-  },
+  } & AssetPositionBody,
 ) {
+  const current = await getSwatchAsset(env.DB, id);
+  if (!current) return null;
+
   const patch: Parameters<typeof updateSwatchAsset>[2] = {};
 
   if (body.enabled !== undefined) {
@@ -286,6 +443,38 @@ export async function patchAsset(
   }
   if (body.cooldownMinutes !== undefined) {
     patch.cooldown_minutes = assertCooldown(body.cooldownMinutes);
+  }
+
+  const position = resolvePositionFields(body, {
+    shares: current.shares,
+    avg_cost: current.avg_cost,
+  });
+  if (position.shares !== undefined) patch.shares = position.shares;
+  if (position.avg_cost !== undefined) patch.avg_cost = position.avg_cost;
+  if (position.atr_triggers_json !== undefined) {
+    patch.atr_triggers_json = position.atr_triggers_json;
+  }
+
+  // Final consistency: if triggers remain after patch, shares+cost must exist.
+  const nextShares =
+    patch.shares !== undefined ? patch.shares : current.shares;
+  const nextAvg =
+    patch.avg_cost !== undefined ? patch.avg_cost : current.avg_cost;
+  const nextTriggers = parseAtrTriggersJson(
+    patch.atr_triggers_json !== undefined
+      ? patch.atr_triggers_json
+      : current.atr_triggers_json,
+  );
+  if (
+    nextTriggers.length > 0 &&
+    (nextShares == null ||
+      nextAvg == null ||
+      nextShares <= 0 ||
+      nextAvg <= 0)
+  ) {
+    throw new Error(
+      "ATR triggers require shares > 0 and a cost basis (avgCost or totalInvested)",
+    );
   }
 
   const row = await updateSwatchAsset(env.DB, id, patch);
@@ -357,6 +546,8 @@ export async function processDueSwatch(env: SwatchEnv): Promise<number> {
   }
 }
 
+type PendingAlert = SwatchAlertLine & { assetId: string };
+
 async function executeSwatchRun(env: SwatchEnv, runId: string): Promise<void> {
   const run = await getSwatchRun(env.DB, runId);
   const config = await getSwatchConfig(env.DB);
@@ -378,7 +569,7 @@ async function executeSwatchRun(env: SwatchEnv, runId: string): Promise<void> {
       listEnabledSwatchAssets(env.DB),
       listExchangeSessions(env.DB),
     ]);
-    const pendingAlerts: Array<SwatchAlertLine & { assetId: string }> = [];
+    const pendingAlerts: PendingAlert[] = [];
 
     let succeeded = 0;
     let failed = 0;
@@ -410,7 +601,7 @@ async function executeSwatchRun(env: SwatchEnv, runId: string): Promise<void> {
           );
         }
 
-        const breached = moveBreachesThreshold(
+        const moveBreached = moveBreachesThreshold(
           move.movePct,
           asset.threshold_pct,
           direction,
@@ -421,22 +612,51 @@ async function executeSwatchRun(env: SwatchEnv, runId: string): Promise<void> {
           nowMs,
         );
 
+        const triggers = parseAtrTriggersJson(asset.atr_triggers_json);
+        const atrPosition =
+          asset.shares != null && asset.avg_cost != null
+            ? computeAtrPosition(asset.shares, asset.avg_cost, move.endClose)
+            : null;
+        const atrTrigger =
+          atrPosition && triggers.length > 0
+            ? findBreachedAtrTrigger(atrPosition, triggers)
+            : null;
+
         await updateSwatchAsset(env.DB, asset.id, {
           last_checked_at: asOf,
           last_close: move.endClose,
           last_move_pct: move.movePct,
+          last_atr_pnl: atrPosition?.pnl ?? null,
+          last_atr_pct: atrPosition?.pct ?? null,
           last_error: null,
         });
 
-        if (breached && !cooling) {
-          pendingAlerts.push({
-            assetId: asset.id,
-            symbol: asset.symbol,
-            exchange: asset.exchange,
-            movePct: move.movePct,
-            windowHours: asset.window_hours,
-            thresholdPct: asset.threshold_pct,
-          });
+        if (!cooling) {
+          if (moveBreached) {
+            pendingAlerts.push({
+              assetId: asset.id,
+              kind: "move",
+              symbol: asset.symbol,
+              exchange: asset.exchange,
+              movePct: move.movePct,
+              windowHours: asset.window_hours,
+              thresholdPct: asset.threshold_pct,
+            });
+          }
+          if (atrTrigger && atrPosition) {
+            pendingAlerts.push({
+              assetId: asset.id,
+              kind: "atr",
+              symbol: asset.symbol,
+              exchange: asset.exchange,
+              pnl: atrPosition.pnl,
+              pct: atrPosition.pct,
+              shares: atrPosition.shares,
+              avgCost: atrPosition.avgCost,
+              triggerUnit: atrTrigger.unit,
+              triggerValue: atrTrigger.value,
+            });
+          }
         }
 
         succeeded += 1;
@@ -461,10 +681,30 @@ async function executeSwatchRun(env: SwatchEnv, runId: string): Promise<void> {
       );
       if (sent) {
         alerted = pendingAlerts.length;
+        const byAsset = new Map<
+          string,
+          { movePct?: number; kinds: Set<string> }
+        >();
         for (const line of pendingAlerts) {
-          await updateSwatchAsset(env.DB, line.assetId, {
+          const entry = byAsset.get(line.assetId) ?? {
+            kinds: new Set<string>(),
+          };
+          entry.kinds.add(line.kind);
+          if (line.kind === "move") entry.movePct = line.movePct;
+          byAsset.set(line.assetId, entry);
+        }
+        for (const [assetId, entry] of byAsset) {
+          const kind =
+            entry.kinds.has("move") && entry.kinds.has("atr")
+              ? "both"
+              : entry.kinds.has("atr")
+                ? "atr"
+                : "move";
+          await updateSwatchAsset(env.DB, assetId, {
             last_alerted_at: asOf,
-            last_alert_move_pct: line.movePct,
+            last_alert_move_pct:
+              entry.movePct !== undefined ? entry.movePct : undefined,
+            last_alert_kind: kind,
           });
         }
       } else {

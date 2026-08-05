@@ -14,6 +14,8 @@ import {
   type TableColumn,
 } from "../components/interaction/TableExpandableRows";
 import {
+  ATR_UNIT_OPTIONS,
+  COST_MODE_OPTIONS,
   DIRECTION_OPTIONS,
   createSwatchAsset,
   deleteSwatchAsset,
@@ -25,6 +27,10 @@ import {
   updateSwatch,
   updateSwatchAsset,
   type SwatchAsset,
+  type SwatchAssetWriteBody,
+  type SwatchAtrTrigger,
+  type SwatchAtrUnit,
+  type SwatchCostInputMode,
   type SwatchDirection,
   type SwatchFormDefaults,
   type SwatchOverview,
@@ -35,6 +41,11 @@ import { formatDateTime } from "../lib/dates";
 import { generateTradingViewUrl } from "../lib/tradingView";
 import "./SwatchPage.css";
 
+type DraftTrigger = {
+  unit: SwatchAtrUnit;
+  value: string;
+};
+
 type DraftAsset = {
   symbol: string;
   exchange: string;
@@ -42,6 +53,10 @@ type DraftAsset = {
   windowHours: string;
   direction: SwatchDirection;
   cooldownMinutes: string;
+  shares: string;
+  costInputMode: SwatchCostInputMode;
+  costValue: string;
+  atrTriggers: DraftTrigger[];
 };
 
 function defaultsToDraft(
@@ -55,6 +70,38 @@ function defaultsToDraft(
     windowHours: String(defaults.windowHours),
     direction: defaults.direction,
     cooldownMinutes: String(defaults.cooldownMinutes),
+    shares: "",
+    costInputMode: defaults.costInputMode,
+    costValue: String(defaults.totalInvested),
+    atrTriggers: [],
+  };
+}
+
+function assetToEditDraft(asset: SwatchAsset, defaults: SwatchFormDefaults): DraftAsset {
+  const mode = defaults.costInputMode;
+  const costValue =
+    mode === "avg"
+      ? asset.avgCost != null
+        ? String(asset.avgCost)
+        : ""
+      : asset.totalInvested != null
+        ? String(asset.totalInvested)
+        : String(defaults.totalInvested);
+
+  return {
+    symbol: asset.symbol,
+    exchange: asset.exchange,
+    thresholdPct: String(asset.thresholdPct),
+    windowHours: String(asset.windowHours),
+    direction: asset.direction,
+    cooldownMinutes: String(asset.cooldownMinutes),
+    shares: asset.shares != null ? String(asset.shares) : "",
+    costInputMode: mode,
+    costValue,
+    atrTriggers: asset.atrTriggers.map((t) => ({
+      unit: t.unit,
+      value: String(t.value),
+    })),
   };
 }
 
@@ -66,6 +113,16 @@ function formatNumber(value: number | null | undefined, digits = 2): string {
   }).format(value);
 }
 
+function formatUsd(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(value)) return "—";
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+    signDisplay: "exceptZero",
+  }).format(value);
+}
+
 function moveTone(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value) || value === 0) return "";
   return value > 0 ? " is-up" : " is-down";
@@ -73,6 +130,58 @@ function moveTone(value: number | null | undefined): string {
 
 function directionLabel(value: SwatchDirection): string {
   return DIRECTION_OPTIONS.find((option) => option.value === value)?.label ?? value;
+}
+
+function parseTriggers(draft: DraftTrigger[]): SwatchAtrTrigger[] {
+  const out: SwatchAtrTrigger[] = [];
+  for (const row of draft) {
+    const raw = row.value.trim();
+    if (!raw) continue;
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value === 0) {
+      throw new Error("ATR triggers must be non-zero numbers");
+    }
+    out.push({ unit: row.unit, value });
+  }
+  return out;
+}
+
+/** Build shares/cost/triggers payload. Empty shares → clear ATR. */
+function atrWriteBody(draft: DraftAsset): SwatchAssetWriteBody {
+  const sharesRaw = draft.shares.trim();
+  if (!sharesRaw) {
+    return {
+      shares: null,
+      avgCost: null,
+      atrTriggers: [],
+    };
+  }
+
+  const shares = Number(sharesRaw);
+  if (!Number.isFinite(shares) || shares <= 0) {
+    throw new Error("Shares must be > 0");
+  }
+
+  const cost = Number(draft.costValue);
+  if (!Number.isFinite(cost) || cost <= 0) {
+    throw new Error(
+      draft.costInputMode === "total"
+        ? "Total invested must be > 0"
+        : "Avg cost must be > 0",
+    );
+  }
+
+  const atrTriggers = parseTriggers(draft.atrTriggers);
+  const body: SwatchAssetWriteBody = {
+    shares,
+    atrTriggers,
+  };
+  if (draft.costInputMode === "total") {
+    body.totalInvested = cost;
+  } else {
+    body.avgCost = cost;
+  }
+  return body;
 }
 
 export function SwatchPage() {
@@ -101,6 +210,10 @@ export function SwatchPage() {
         current.exchange || data.exchanges[0]?.value || "TOR",
       ),
       symbol: current.symbol,
+      shares: current.shares,
+      costInputMode: current.costInputMode || defaults.costInputMode,
+      costValue: current.costValue || String(defaults.totalInvested),
+      atrTriggers: current.atrTriggers,
     }));
     return data;
   }
@@ -160,11 +273,19 @@ export function SwatchPage() {
   ]);
 
   function rememberDefaultsFromDraft(next: DraftAsset) {
+    const totalInvested =
+      next.costInputMode === "total" && Number(next.costValue) > 0
+        ? Number(next.costValue)
+        : formDefaults.totalInvested;
     const defaults: SwatchFormDefaults = {
       thresholdPct: Number(next.thresholdPct),
       windowHours: Number(next.windowHours),
       direction: next.direction,
       cooldownMinutes: Number(next.cooldownMinutes),
+      totalInvested: Number.isFinite(totalInvested)
+        ? totalInvested
+        : formDefaults.totalInvested,
+      costInputMode: next.costInputMode,
     };
     if (
       !Number.isFinite(defaults.thresholdPct) ||
@@ -246,14 +367,19 @@ export function SwatchPage() {
     setError(null);
     try {
       rememberDefaultsFromDraft(draft);
-      await createSwatchAsset({
+      const atr = atrWriteBody(draft);
+      const payload: Parameters<typeof createSwatchAsset>[0] = {
         symbol: draft.symbol,
         exchange: draft.exchange,
         thresholdPct: Number(draft.thresholdPct),
         windowHours: Number(draft.windowHours),
         direction: draft.direction,
         cooldownMinutes: Number(draft.cooldownMinutes),
-      });
+      };
+      if (atr.shares != null) {
+        Object.assign(payload, atr);
+      }
+      await createSwatchAsset(payload);
       setDraft(defaultsToDraft(formDefaults, draft.exchange));
       await refresh();
     } catch (err) {
@@ -269,11 +395,13 @@ export function SwatchPage() {
     setError(null);
     try {
       rememberDefaultsFromDraft(draftRow);
+      const atr = atrWriteBody(draftRow);
       await updateSwatchAsset(asset.id, {
         thresholdPct: Number(draftRow.thresholdPct),
         windowHours: Number(draftRow.windowHours),
         direction: draftRow.direction,
         cooldownMinutes: Number(draftRow.cooldownMinutes),
+        ...atr,
       });
       await refresh();
     } catch (err) {
@@ -302,6 +430,11 @@ export function SwatchPage() {
     setError(null);
     try {
       await deleteSwatchAsset(asset.id);
+      setEditDrafts((current) => {
+        const next = { ...current };
+        delete next[asset.id];
+        return next;
+      });
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete asset");
@@ -311,16 +444,7 @@ export function SwatchPage() {
   }
 
   function ensureEditDraft(asset: SwatchAsset): DraftAsset {
-    return (
-      editDrafts[asset.id] ?? {
-        symbol: asset.symbol,
-        exchange: asset.exchange,
-        thresholdPct: String(asset.thresholdPct),
-        windowHours: String(asset.windowHours),
-        direction: asset.direction,
-        cooldownMinutes: String(asset.cooldownMinutes),
-      }
-    );
+    return editDrafts[asset.id] ?? assetToEditDraft(asset, formDefaults);
   }
 
   function runLabel(run: SwatchRun | null, data: SwatchOverview): string {
@@ -348,6 +472,135 @@ export function SwatchPage() {
       value: item.value,
       label: item.label,
     })) ?? [];
+
+  function renderAtrFields(
+    draftRow: DraftAsset,
+    onChange: (next: DraftAsset) => void,
+  ) {
+    return (
+      <>
+        <div className="swatch-add-fields">
+          <NumericInput
+            label="Shares owned"
+            help="Optional. Enables all-time return (ATR) alerts."
+            min={0}
+            step="any"
+            value={draftRow.shares}
+            onChange={(event) =>
+              onChange({ ...draftRow, shares: event.target.value })
+            }
+          />
+          {draftRow.shares.trim() ? (
+            <>
+              <NumericInput
+                label={
+                  draftRow.costInputMode === "total"
+                    ? "Total invested ($)"
+                    : "Avg cost / share ($)"
+                }
+                help="Used with shares to compute unrealized P&L."
+                min={0}
+                step="any"
+                value={draftRow.costValue}
+                onChange={(event) =>
+                  onChange({ ...draftRow, costValue: event.target.value })
+                }
+              />
+            </>
+          ) : null}
+        </div>
+        {draftRow.shares.trim() ? (
+          <>
+            <PillSelect
+              label="Cost basis"
+              options={COST_MODE_OPTIONS}
+              value={draftRow.costInputMode}
+              onChange={(value) =>
+                onChange({
+                  ...draftRow,
+                  costInputMode: value as SwatchCostInputMode,
+                  costValue:
+                    value === "total"
+                      ? String(formDefaults.totalInvested)
+                      : draftRow.costValue,
+                })
+              }
+              limit={4}
+            />
+            <div className="swatch-atr-triggers">
+              <p className="swatch-add-hint">
+                ATR triggers — alert when unrealized P&L ($) or return (%)
+                clears a positive level or drops through a negative one.
+              </p>
+              {draftRow.atrTriggers.map((trigger, index) => (
+                <div key={index} className="swatch-atr-trigger-row">
+                  <NumericInput
+                    label={`Trigger ${index + 1}`}
+                    step="any"
+                    value={trigger.value}
+                    onChange={(event) => {
+                      const atrTriggers = draftRow.atrTriggers.map((item, i) =>
+                        i === index
+                          ? { ...item, value: event.target.value }
+                          : item,
+                      );
+                      onChange({ ...draftRow, atrTriggers });
+                    }}
+                  />
+                  <PillSelect
+                    label="Unit"
+                    options={ATR_UNIT_OPTIONS}
+                    value={trigger.unit}
+                    onChange={(value) => {
+                      const atrTriggers = draftRow.atrTriggers.map((item, i) =>
+                        i === index
+                          ? { ...item, unit: value as SwatchAtrUnit }
+                          : item,
+                      );
+                      onChange({ ...draftRow, atrTriggers });
+                    }}
+                    limit={4}
+                  />
+                  <Button
+                    variant="ghost"
+                    className="swatch-atr-trigger-remove"
+                    disabled={busy}
+                    onClick={() =>
+                      onChange({
+                        ...draftRow,
+                        atrTriggers: draftRow.atrTriggers.filter(
+                          (_, i) => i !== index,
+                        ),
+                      })
+                    }
+                  >
+                    <Trash2 size={16} strokeWidth={2.5} />
+                    Remove level
+                  </Button>
+                </div>
+              ))}
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() =>
+                  onChange({
+                    ...draftRow,
+                    atrTriggers: [
+                      ...draftRow.atrTriggers,
+                      { unit: "usd", value: "" },
+                    ],
+                  })
+                }
+              >
+                <Plus size={16} strokeWidth={2.5} />
+                Add ATR trigger
+              </Button>
+            </div>
+          </>
+        ) : null}
+      </>
+    );
+  }
 
   const symbolColumns: TableColumn<SwatchAsset>[] = [
     {
@@ -387,10 +640,22 @@ export function SwatchPage() {
       cell: (row) => directionLabel(row.direction),
     },
     {
-      id: "cooldown",
-      header: "Cool min",
+      id: "shares",
+      header: "Shares",
       align: "right",
-      accessor: (row) => row.cooldownMinutes,
+      accessor: (row) => row.shares,
+      cell: (row) => formatNumber(row.shares, 4),
+    },
+    {
+      id: "atr",
+      header: "ATR P&L",
+      align: "right",
+      accessor: (row) => row.lastAtrPnl,
+      cell: (row) => (
+        <span className={`swatch-move${moveTone(row.lastAtrPnl)}`}>
+          {formatUsd(row.lastAtrPnl)}
+        </span>
+      ),
     },
     {
       id: "move",
@@ -435,6 +700,28 @@ export function SwatchPage() {
         </a>
       ),
     },
+    {
+      id: "remove",
+      header: "",
+      sortable: false,
+      accessor: (row) => row.id,
+      cell: (row) => (
+        <Button
+          variant="ghost"
+          iconOnly
+          className="swatch-row-remove"
+          disabled={busy}
+          aria-label={`Remove ${row.symbol} from SWATCH`}
+          title={`Remove ${row.symbol}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            void handleDeleteAsset(row);
+          }}
+        >
+          <Trash2 size={15} strokeWidth={2.5} />
+        </Button>
+      ),
+    },
   ];
 
   const scheduleSections: SectionsCardSection[] = [
@@ -442,7 +729,7 @@ export function SwatchPage() {
       id: "schedule",
       title: "Global schedule",
       description:
-        "One timer for the whole watchlist. Per-asset thresholds, windows, and cooldowns live on each row.",
+        "One timer for the whole watchlist. Per-asset thresholds, windows, cooldowns, and ATR live on each row.",
       columns: [
         <NumericInput
           key="intervalHours"
@@ -470,8 +757,9 @@ export function SwatchPage() {
         </h1>
         <p>
           Your personal sell radar: watch any exchange+symbol, measure
-          close-to-close % moves over a short window, and ping Telegram when it
-          jumps past your threshold (with a per-asset cooldown).
+          close-to-close % moves over a short window, and optionally alert on
+          all-time return (unrealized P&L from shares × cost). Telegram gets
+          both kinds of pings, with a per-asset cooldown.
         </p>
       </header>
 
@@ -539,8 +827,9 @@ export function SwatchPage() {
           <div className="swatch-add">
             <h2 className="swatch-add-title">Add asset</h2>
             <p className="swatch-add-hint">
-              Changing threshold / window / direction / cooldown here updates the
-              defaults remembered in this browser for the next add.
+              Changing threshold / window / direction / cooldown / total invested
+              here updates the defaults remembered in this browser for the next
+              add.
             </p>
             <div className="swatch-add-fields">
               <div className="swatch-field">
@@ -620,6 +909,7 @@ export function SwatchPage() {
               }
               limit={4}
             />
+            {renderAtrFields(draft, (next) => setDraft(next))}
             <div className="swatch-add-actions">
               <Button
                 disabled={busy || !draft.symbol.trim()}
@@ -654,10 +944,21 @@ export function SwatchPage() {
                     <p className="swatch-add-hint">
                       Last alert{" "}
                       {row.lastAlertedAt
-                        ? `${formatDateTime(row.lastAlertedAt)} (${formatNumber(row.lastAlertMovePct, 1)}%)`
+                        ? `${formatDateTime(row.lastAlertedAt)}${
+                            row.lastAlertKind
+                              ? ` · ${row.lastAlertKind}`
+                              : ""
+                          }${
+                            row.lastAlertMovePct != null
+                              ? ` (${formatNumber(row.lastAlertMovePct, 1)}%)`
+                              : ""
+                          }`
                         : "never"}
                       {row.lastClose != null
                         ? ` · last close ${formatNumber(row.lastClose)}`
+                        : ""}
+                      {row.lastAtrPct != null
+                        ? ` · ATR ${formatNumber(row.lastAtrPct, 1)}%`
                         : ""}
                     </p>
                     <div className="swatch-asset-edit-grid">
@@ -722,6 +1023,12 @@ export function SwatchPage() {
                       }
                       limit={4}
                     />
+                    {renderAtrFields(edit, (next) =>
+                      setEditDrafts((current) => ({
+                        ...current,
+                        [row.id]: next,
+                      })),
+                    )}
                     <div className="swatch-asset-edit-actions">
                       <Button
                         variant="ghost"
@@ -744,7 +1051,7 @@ export function SwatchPage() {
                         onClick={() => void handleDeleteAsset(row)}
                       >
                         <Trash2 size={16} strokeWidth={2.5} />
-                        Remove
+                        Remove from {PRODUCT_NAMES.SWATCH}
                       </Button>
                     </div>
                   </div>
