@@ -3,7 +3,12 @@
  * Product name for cron + queue deep price analysis of EVG warm symbols.
  * Internal identifiers keep the "analysis" prefix; TAS is the product alias.
  */
+import { isExchangeSessionOpen } from "../../../shared/exchangeHours";
 import { createMarketDataService, type MarketEnv } from "../market/service";
+import {
+  listDistinctWarmExchanges,
+  listExchangeSessions,
+} from "../scanners/repo";
 import type { WarmSymbolRow } from "../scanners/types";
 import {
   countAllWarmSymbols,
@@ -245,13 +250,24 @@ export async function startAnalysisRun(
   return serializeRun(run);
 }
 
-/** TAS cron: start when enabled and next_run_at is due. */
+/** TAS cron: start when enabled, due, and at least one warm exchange is open. */
 export async function processDueAnalysis(env: AnalysisEnv): Promise<number> {
   const due = await isAnalysisDue(env.DB, nowIso());
   if (!due) return 0;
 
   const active = await getActiveAnalysisRun(env.DB);
   if (active) return 0;
+
+  const now = new Date();
+  const [sessions, warmExchanges] = await Promise.all([
+    listExchangeSessions(env.DB),
+    listDistinctWarmExchanges(env.DB),
+  ]);
+  const anyOpen = warmExchanges.some((code) => {
+    const session = sessions.get(code);
+    return session ? isExchangeSessionOpen(session, now) : false;
+  });
+  if (!anyOpen) return 0;
 
   try {
     await startAnalysisRun(env, "cron");
@@ -302,6 +318,8 @@ export async function processAnalysisJob(
       message.offset,
       run.page_size,
     );
+    const sessions = await listExchangeSessions(env.DB);
+    const now = new Date();
 
     let succeeded = 0;
     let failed = 0;
@@ -309,6 +327,11 @@ export async function processAnalysisJob(
     const dailyRange = dailyRangeForLookback(config.lookback_days);
 
     for (const symbol of page) {
+      const session = sessions.get(symbol.exchange);
+      if (!session || !isExchangeSessionOpen(session, now)) {
+        continue;
+      }
+
       try {
         const analysis = await analyzeSymbol(market, symbol, {
           asOf,

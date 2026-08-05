@@ -15,6 +15,12 @@ export interface ExchangeScannerRow {
   interval_hours: number;
   min_avg_volume_10d: number | null;
   min_approx_daily_value: number | null;
+  /** IANA timezone for regular session checks. */
+  timezone: string;
+  /** Local open HH:MM (24h). */
+  open_local: string;
+  /** Local close HH:MM (24h), exclusive. */
+  close_local: string;
   last_run_at: string | null;
   next_run_at: string | null;
   last_run_status: string | null;

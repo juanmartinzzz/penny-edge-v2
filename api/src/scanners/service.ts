@@ -3,6 +3,12 @@
  * Product name for exchange_scanners / warm_symbols cron + queue batch.
  * Internal identifiers keep the "scanner" prefix; EVG is the product alias.
  */
+import {
+  isExchangeSessionOpen,
+  isValidHhmm,
+  parseHhmmToMinutes,
+  sessionFromRow,
+} from "../../../shared/exchangeHours";
 import { createMarketDataService, type MarketEnv } from "../market/service";
 import {
   clearStaleWarmSymbols,
@@ -83,6 +89,9 @@ export async function patchScanner(
     intervalHours?: number;
     minAvgVolume10d?: number | null;
     minApproxDailyValue?: number | null;
+    timezone?: string;
+    openLocal?: string;
+    closeLocal?: string;
   },
 ) {
   const scanner = await getScanner(env.DB, scannerId);
@@ -103,6 +112,40 @@ export async function patchScanner(
 
   if (body.minApproxDailyValue !== undefined) {
     patch.min_approx_daily_value = body.minApproxDailyValue;
+  }
+
+  if (body.timezone !== undefined) {
+    const timezone = body.timezone.trim();
+    if (!timezone) throw new Error("timezone is required");
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: timezone });
+    } catch {
+      throw new Error("timezone must be a valid IANA timezone");
+    }
+    patch.timezone = timezone;
+  }
+
+  if (body.openLocal !== undefined) {
+    if (!isValidHhmm(body.openLocal)) {
+      throw new Error("openLocal must be HH:MM (24h)");
+    }
+    patch.open_local = body.openLocal.trim();
+  }
+
+  if (body.closeLocal !== undefined) {
+    if (!isValidHhmm(body.closeLocal)) {
+      throw new Error("closeLocal must be HH:MM (24h)");
+    }
+    patch.close_local = body.closeLocal.trim();
+  }
+
+  const nextOpen = patch.open_local ?? scanner.open_local;
+  const nextClose = patch.close_local ?? scanner.close_local;
+  if (
+    (body.openLocal !== undefined || body.closeLocal !== undefined) &&
+    (parseHhmmToMinutes(nextOpen) ?? 0) >= (parseHhmmToMinutes(nextClose) ?? 0)
+  ) {
+    throw new Error("openLocal must be before closeLocal");
   }
 
   if (body.enabled !== undefined) {
@@ -176,12 +219,17 @@ export async function startScannerRun(
   return serializeRun(run);
 }
 
-/** EVG cron: start due enabled exchange gates. */
+/** EVG cron: start due enabled exchange gates that are in regular session. */
 export async function processDueScanners(env: ScannerEnv): Promise<number> {
   const due = await listDueScanners(env.DB, nowIso());
   let started = 0;
+  const now = new Date();
 
   for (const scanner of due) {
+    if (!isExchangeSessionOpen(sessionFromRow(scanner), now)) {
+      continue;
+    }
+
     const active = await getActiveRun(env.DB, scanner.id);
     if (active) continue;
 
@@ -361,6 +409,10 @@ function serializeScanner(scanner: Awaited<ReturnType<typeof getScanner>>) {
     intervalHours: scanner.interval_hours,
     minAvgVolume10d: scanner.min_avg_volume_10d,
     minApproxDailyValue: scanner.min_approx_daily_value,
+    timezone: scanner.timezone,
+    openLocal: scanner.open_local,
+    closeLocal: scanner.close_local,
+    sessionOpen: isExchangeSessionOpen(sessionFromRow(scanner)),
     lastRunAt: scanner.last_run_at,
     nextRunAt: scanner.next_run_at,
     lastRunStatus: scanner.last_run_status,

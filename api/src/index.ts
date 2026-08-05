@@ -254,6 +254,9 @@ app.patch("/scanners/:id", async (c) => {
       intervalHours?: number;
       minAvgVolume10d?: number | null;
       minApproxDailyValue?: number | null;
+      timezone?: string;
+      openLocal?: string;
+      closeLocal?: string;
     }>();
 
     const scanner = await patchScanner(c.env, c.req.param("id"), body);

@@ -43,6 +43,9 @@ export async function updateScanner(
     interval_hours?: number;
     min_avg_volume_10d?: number | null;
     min_approx_daily_value?: number | null;
+    timezone?: string;
+    open_local?: string;
+    close_local?: string;
     next_run_at?: string | null;
     last_run_at?: string | null;
     last_run_status?: string | null;
@@ -65,6 +68,9 @@ export async function updateScanner(
     patch.min_approx_daily_value !== undefined
       ? patch.min_approx_daily_value
       : current.min_approx_daily_value;
+  const timezone = patch.timezone ?? current.timezone;
+  const openLocal = patch.open_local ?? current.open_local;
+  const closeLocal = patch.close_local ?? current.close_local;
   const nextRunAt =
     patch.next_run_at !== undefined ? patch.next_run_at : current.next_run_at;
   const lastRunAt =
@@ -93,6 +99,9 @@ export async function updateScanner(
          interval_hours = ?,
          min_avg_volume_10d = ?,
          min_approx_daily_value = ?,
+         timezone = ?,
+         open_local = ?,
+         close_local = ?,
          next_run_at = ?,
          last_run_at = ?,
          last_run_status = ?,
@@ -107,6 +116,9 @@ export async function updateScanner(
       intervalHours,
       minVol,
       minValue,
+      timezone,
+      openLocal,
+      closeLocal,
       nextRunAt,
       lastRunAt,
       lastRunStatus,
@@ -119,6 +131,46 @@ export async function updateScanner(
     .run();
 
   return getScanner(db, id);
+}
+
+/** code → session hours for TAS / SWATCH gates. */
+export async function listExchangeSessions(
+  db: D1Database,
+): Promise<Map<string, { timezone: string; openLocal: string; closeLocal: string }>> {
+  const result = await db
+    .prepare(
+      `SELECT code, timezone, open_local, close_local FROM exchange_scanners`,
+    )
+    .all<{
+      code: string;
+      timezone: string;
+      open_local: string;
+      close_local: string;
+    }>();
+
+  const map = new Map<
+    string,
+    { timezone: string; openLocal: string; closeLocal: string }
+  >();
+  for (const row of result.results ?? []) {
+    map.set(row.code, {
+      timezone: row.timezone,
+      openLocal: row.open_local,
+      closeLocal: row.close_local,
+    });
+  }
+  return map;
+}
+
+export async function listDistinctWarmExchanges(
+  db: D1Database,
+): Promise<string[]> {
+  const result = await db
+    .prepare(
+      `SELECT DISTINCT exchange AS exchange FROM warm_symbols WHERE is_warm = 1`,
+    )
+    .all<{ exchange: string }>();
+  return (result.results ?? []).map((row) => row.exchange);
 }
 
 export async function countWarmSymbols(

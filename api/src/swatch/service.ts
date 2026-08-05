@@ -3,7 +3,9 @@
  * Global schedule + per-asset close-to-close variation checks → Telegram.
  * Processes inline (no queue) — watchlists stay small.
  */
+import { isExchangeSessionOpen } from "../../../shared/exchangeHours";
 import { createMarketDataService, type MarketEnv } from "../market/service";
+import { listExchangeSessions } from "../scanners/repo";
 import {
   formatSwatchAlert,
   sendTelegramMessage,
@@ -335,6 +337,17 @@ export async function processDueSwatch(env: SwatchEnv): Promise<number> {
   const active = await getActiveSwatchRun(env.DB);
   if (active) return 0;
 
+  const now = new Date();
+  const [sessions, assets] = await Promise.all([
+    listExchangeSessions(env.DB),
+    listEnabledSwatchAssets(env.DB),
+  ]);
+  const anyOpen = assets.some((asset) => {
+    const session = sessions.get(asset.exchange);
+    return session ? isExchangeSessionOpen(session, now) : false;
+  });
+  if (!anyOpen) return 0;
+
   try {
     await startSwatchRun(env, "cron");
     return 1;
@@ -361,15 +374,24 @@ async function executeSwatchRun(env: SwatchEnv, runId: string): Promise<void> {
 
   try {
     const market = createMarketDataService(env);
-    const assets = await listEnabledSwatchAssets(env.DB);
+    const [assets, sessions] = await Promise.all([
+      listEnabledSwatchAssets(env.DB),
+      listExchangeSessions(env.DB),
+    ]);
     const pendingAlerts: Array<SwatchAlertLine & { assetId: string }> = [];
 
     let succeeded = 0;
     let failed = 0;
     const asOf = nowIso();
     const nowMs = Date.now();
+    const now = new Date(nowMs);
 
     for (const asset of assets) {
+      const session = sessions.get(asset.exchange);
+      if (!session || !isExchangeSessionOpen(session, now)) {
+        continue;
+      }
+
       try {
         const direction = isSwatchDirection(asset.direction)
           ? asset.direction

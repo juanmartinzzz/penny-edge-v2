@@ -50,6 +50,11 @@ export type Scanner = {
   intervalHours: number;
   minAvgVolume10d: number | null;
   minApproxDailyValue: number | null;
+  timezone: string;
+  openLocal: string;
+  closeLocal: string;
+  /** Server-evaluated: exchange is in regular session right now. */
+  sessionOpen: boolean;
   lastRunAt: string | null;
   nextRunAt: string | null;
   lastRunStatus: string | null;
@@ -77,6 +82,9 @@ export function updateScanner(
     intervalHours?: number;
     minAvgVolume10d?: number | null;
     minApproxDailyValue?: number | null;
+    timezone?: string;
+    openLocal?: string;
+    closeLocal?: string;
   },
 ) {
   return apiFetch<{ scanner: Scanner }>(`/scanners/${id}`, {

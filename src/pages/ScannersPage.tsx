@@ -18,9 +18,39 @@ import {
   type ScannerRun,
   type WarmSymbol,
 } from "../lib/scanners";
+import {
+  isExchangeSessionOpen,
+  loadExchangeOpenHours,
+  saveExchangeOpenHours,
+} from "../lib/exchangeHours";
 import { PRODUCT_NAMES } from "../lib/productNames";
 import { formatDateTime } from "../lib/dates";
 import "./ScannersPage.css";
+
+type ScannerDraft = {
+  intervalHours: string;
+  minAvgVolume10d: string;
+  minApproxDailyValue: string;
+  timezone: string;
+  openLocal: string;
+  closeLocal: string;
+};
+
+function draftFromScanner(scanner: Scanner): ScannerDraft {
+  const fallback = loadExchangeOpenHours(scanner.code);
+  return {
+    intervalHours: String(scanner.intervalHours),
+    minAvgVolume10d:
+      scanner.minAvgVolume10d == null ? "" : String(scanner.minAvgVolume10d),
+    minApproxDailyValue:
+      scanner.minApproxDailyValue == null
+        ? ""
+        : String(scanner.minApproxDailyValue),
+    timezone: scanner.timezone || fallback.timezone,
+    openLocal: scanner.openLocal || fallback.openLocal,
+    closeLocal: scanner.closeLocal || fallback.closeLocal,
+  };
+}
 
 function formatNumber(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return "—";
@@ -80,19 +110,17 @@ function parseOptionalNumber(raw: string): number | null {
   return value;
 }
 
-function draftMatchesScanner(
-  scanner: Scanner,
-  draft: {
-    intervalHours: string;
-    minAvgVolume10d: string;
-    minApproxDailyValue: string;
-  },
-): boolean {
+function draftMatchesScanner(scanner: Scanner, draft: ScannerDraft): boolean {
   try {
+    const fallback = loadExchangeOpenHours(scanner.code);
     return (
       Number(draft.intervalHours) === scanner.intervalHours &&
       parseOptionalNumber(draft.minAvgVolume10d) === scanner.minAvgVolume10d &&
-      parseOptionalNumber(draft.minApproxDailyValue) === scanner.minApproxDailyValue
+      parseOptionalNumber(draft.minApproxDailyValue) ===
+        scanner.minApproxDailyValue &&
+      draft.timezone.trim() === (scanner.timezone || fallback.timezone) &&
+      draft.openLocal.trim() === (scanner.openLocal || fallback.openLocal) &&
+      draft.closeLocal.trim() === (scanner.closeLocal || fallback.closeLocal)
     );
   } catch {
     return false;
@@ -105,16 +133,7 @@ export function ScannersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [drafts, setDrafts] = useState<
-    Record<
-      string,
-      {
-        intervalHours: string;
-        minAvgVolume10d: string;
-        minApproxDailyValue: string;
-      }
-    >
-  >({});
+  const [drafts, setDrafts] = useState<Record<string, ScannerDraft>>({});
 
   async function refreshList() {
     const data = await listScanners();
@@ -123,15 +142,7 @@ export function ScannersPage() {
       const next = { ...current };
       for (const scanner of data.scanners) {
         if (!next[scanner.id]) {
-          next[scanner.id] = {
-            intervalHours: String(scanner.intervalHours),
-            minAvgVolume10d:
-              scanner.minAvgVolume10d == null ? "" : String(scanner.minAvgVolume10d),
-            minApproxDailyValue:
-              scanner.minApproxDailyValue == null
-                ? ""
-                : String(scanner.minApproxDailyValue),
-          };
+          next[scanner.id] = draftFromScanner(scanner);
         }
       }
       return next;
@@ -238,11 +249,18 @@ export function ScannersPage() {
     setBusyId(scanner.id);
     setError(null);
     try {
+      const openHours = {
+        timezone: draft.timezone.trim(),
+        openLocal: draft.openLocal.trim(),
+        closeLocal: draft.closeLocal.trim(),
+      };
       const { scanner: updated } = await updateScanner(scanner.id, {
         intervalHours: Number(draft.intervalHours),
         minAvgVolume10d: parseOptionalNumber(draft.minAvgVolume10d),
         minApproxDailyValue: parseOptionalNumber(draft.minApproxDailyValue),
+        ...openHours,
       });
+      saveExchangeOpenHours(scanner.code, openHours);
       setScanners((current) =>
         current.map((item) =>
           item.id === scanner.id ? { ...item, ...updated, symbols: item.symbols } : item,
@@ -250,15 +268,7 @@ export function ScannersPage() {
       );
       setDrafts((current) => ({
         ...current,
-        [scanner.id]: {
-          intervalHours: String(updated.intervalHours),
-          minAvgVolume10d:
-            updated.minAvgVolume10d == null ? "" : String(updated.minAvgVolume10d),
-          minApproxDailyValue:
-            updated.minApproxDailyValue == null
-              ? ""
-              : String(updated.minApproxDailyValue),
-        },
+        [scanner.id]: draftFromScanner(updated),
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save settings");
@@ -329,7 +339,8 @@ export function ScannersPage() {
         </h1>
         <p>
           Scheduled per-exchange volume gate. Symbols that clear the filters are
-          kept warm as each batch finishes.
+          kept warm as each batch finishes. Cron waits for each exchange’s open
+          hours; TAS and SWATCH skip closed sessions too.
         </p>
       </header>
 
@@ -340,16 +351,17 @@ export function ScannersPage() {
 
       <div className="scanners-list">
         {scanners.map((scanner) => {
-          const draft = drafts[scanner.id] ?? {
-            intervalHours: String(scanner.intervalHours),
-            minAvgVolume10d: "",
-            minApproxDailyValue: "",
-          };
+          const draft = drafts[scanner.id] ?? draftFromScanner(scanner);
           const expanded = expandedId === scanner.id;
           const running =
             scanner.activeRun?.status === "queued" ||
             scanner.activeRun?.status === "running";
           const settingsDirty = !draftMatchesScanner(scanner, draft);
+          const sessionOpen = isExchangeSessionOpen({
+            timezone: draft.timezone,
+            openLocal: draft.openLocal,
+            closeLocal: draft.closeLocal,
+          });
 
           return (
             <article key={scanner.id} className="scanner-card">
@@ -366,6 +378,11 @@ export function ScannersPage() {
                     <span className={`scanner-pill${scanner.enabled ? " is-on" : ""}`}>
                       <AcronymLabel acronym="EVG" layout="inline" />{" "}
                       {scanner.enabled ? "ON" : "OFF"}
+                    </span>
+                    <span
+                      className={`scanner-pill${sessionOpen ? " is-session-open" : ""}`}
+                    >
+                      {sessionOpen ? "Session open" : "Session closed"}
                     </span>
                     <span className={`scanner-pill${running ? " is-running" : ""}`}>
                       {scanner.warmCount} gated
@@ -420,6 +437,62 @@ export function ScannersPage() {
                         }))
                       }
                     />
+                    <label className="numeric-input" htmlFor={`tz-${scanner.id}`}>
+                      <span className="numeric-input-label">Timezone</span>
+                      <input
+                        id={`tz-${scanner.id}`}
+                        type="text"
+                        value={draft.timezone}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [scanner.id]: {
+                              ...draft,
+                              timezone: event.target.value,
+                            },
+                          }))
+                        }
+                        placeholder="America/New_York"
+                      />
+                    </label>
+                    <label className="numeric-input" htmlFor={`open-${scanner.id}`}>
+                      <span className="numeric-input-label">Open (local)</span>
+                      <input
+                        id={`open-${scanner.id}`}
+                        type="time"
+                        value={draft.openLocal}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [scanner.id]: {
+                              ...draft,
+                              openLocal: event.target.value,
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                    <label className="numeric-input" htmlFor={`close-${scanner.id}`}>
+                      <span className="numeric-input-label">Close (local)</span>
+                      <input
+                        id={`close-${scanner.id}`}
+                        type="time"
+                        value={draft.closeLocal}
+                        onChange={(event) =>
+                          setDrafts((current) => ({
+                            ...current,
+                            [scanner.id]: {
+                              ...draft,
+                              closeLocal: event.target.value,
+                            },
+                          }))
+                        }
+                      />
+                      <span className="numeric-input-help">
+                        Cron skips Yahoo outside Mon–Fri open→close. Manual Run
+                        still works.
+                      </span>
+                    </label>
                   </div>
 
                   <div className="scanner-actions">

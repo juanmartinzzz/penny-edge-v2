@@ -115,6 +115,11 @@
   border-color: var(--text-muted);
 }
 
+.scanner-pill.is-session-open {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
+  color: var(--text);
+}
+
 .scanner-pill .acronym-label-full {
   font-size: 0.55rem;
   text-transform: none;
