@@ -10,10 +10,23 @@
   border-bottom: 1px solid var(--border);
 }
 
+.sections-card.is-collapsed .sections-card-chrome {
+  border-bottom: 0;
+}
+
+.sections-card-chrome-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 .sections-card-chrome-title {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  min-width: 0;
+  flex: 1;
 }
 
 .sections-card-chrome-title .acronym-label-short {

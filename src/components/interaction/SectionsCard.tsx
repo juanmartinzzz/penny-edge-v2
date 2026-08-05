@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import "./SectionsCard.css";
 
 const STORAGE_PREFIX = "penny-edge.sections-card.";
@@ -21,6 +21,8 @@ export type SectionsCardSection = {
   defaultCollapsed?: boolean;
   /** Optional control on the right side of the section header. */
   headerAction?: ReactNode;
+  /** Fires when a collapsible section becomes open (including initial open). */
+  onExpand?: () => void;
 };
 
 type SectionsCardProps = {
@@ -32,7 +34,18 @@ type SectionsCardProps = {
   footer?: ReactNode;
   sections: SectionsCardSection[];
   className?: string;
+  /**
+   * Collapse the whole body (all sections + footer) with one control in the chrome.
+   * Default false.
+   */
+  collapsible?: boolean;
+  /** Initial card collapsed state when nothing is stored yet. Default true. */
+  defaultCollapsed?: boolean;
+  /** Fires when a collapsible card becomes open (including initial open). */
+  onExpand?: () => void;
 };
+
+const CARD_BODY_KEY = "__card__";
 
 function storageKey(cardId: string, sectionId: string): string {
   return `${STORAGE_PREFIX}${cardId}.${sectionId}.collapsed`;
@@ -108,6 +121,7 @@ function Section({
     collapsible = false,
     defaultCollapsed = true,
     headerAction,
+    onExpand,
   } = section;
 
   const [collapsed, setCollapsed] = useState(() => {
@@ -116,6 +130,17 @@ function Section({
   });
 
   const isOpen = !collapsed;
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      return;
+    }
+    if (wasOpenRef.current) return;
+    wasOpenRef.current = true;
+    onExpand?.();
+  }, [isOpen, onExpand]);
 
   function toggle() {
     if (!collapsible) return;
@@ -174,25 +199,79 @@ export function SectionsCard({
   footer,
   sections,
   className = "",
+  collapsible = false,
+  defaultCollapsed = true,
+  onExpand,
 }: SectionsCardProps) {
+  const [collapsed, setCollapsed] = useState(() => {
+    if (!collapsible) return false;
+    return readCollapsed(id, CARD_BODY_KEY, defaultCollapsed);
+  });
+
+  const isOpen = !collapsed;
+  const wasOpenRef = useRef(false);
+
+  useEffect(() => {
+    if (!collapsible) return;
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      return;
+    }
+    if (wasOpenRef.current) return;
+    wasOpenRef.current = true;
+    onExpand?.();
+  }, [collapsible, isOpen, onExpand]);
+
+  function toggleCard() {
+    if (!collapsible) return;
+    setCollapsed((current) => {
+      const next = !current;
+      writeCollapsed(id, CARD_BODY_KEY, next);
+      return next;
+    });
+  }
+
+  const showChrome = title != null || meta != null || collapsible;
+
   return (
-    <article className={`sections-card ${className}`.trim()}>
-      {title != null || meta != null ? (
+    <article
+      className={`sections-card${collapsible ? " is-collapsible" : ""}${
+        collapsible && !isOpen ? " is-collapsed" : ""
+      } ${className}`.trim()}
+    >
+      {showChrome ? (
         <div className="sections-card-chrome">
-          <div className="sections-card-chrome-title">
-            {title}
-            {meta ? <div className="sections-card-meta">{meta}</div> : null}
+          <div className="sections-card-chrome-row">
+            <div className="sections-card-chrome-title">
+              {title}
+              {meta ? <div className="sections-card-meta">{meta}</div> : null}
+            </div>
+            {collapsible ? (
+              <button
+                type="button"
+                className="sections-card-collapse"
+                onClick={toggleCard}
+                aria-expanded={isOpen}
+                aria-label={isOpen ? "Collapse card" : "Expand card"}
+              >
+                {isOpen ? "Collapse" : "Expand"}
+              </button>
+            ) : null}
           </div>
         </div>
       ) : null}
 
-      <div className="sections-card-sections">
-        {sections.map((section) => (
-          <Section key={section.id} cardId={id} section={section} />
-        ))}
-      </div>
+      {isOpen ? (
+        <>
+          <div className="sections-card-sections">
+            {sections.map((section) => (
+              <Section key={section.id} cardId={id} section={section} />
+            ))}
+          </div>
 
-      {footer ? <div className="sections-card-footer">{footer}</div> : null}
+          {footer ? <div className="sections-card-footer">{footer}</div> : null}
+        </>
+      ) : null}
     </article>
   );
 }

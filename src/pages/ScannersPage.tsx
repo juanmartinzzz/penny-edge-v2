@@ -1,8 +1,12 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown, ChevronUp, Play, Save } from "lucide-react";
+import { Play, Save } from "lucide-react";
 import { Button } from "../components/interaction/Button";
 import { NumericInput } from "../components/interaction/NumericInput";
+import {
+  SectionsCard,
+  type SectionsCardSection,
+} from "../components/interaction/SectionsCard";
 import { AcronymLabel } from "../components/AcronymLabel";
 import {
   TableExpandableRows,
@@ -54,7 +58,9 @@ function draftFromScanner(scanner: Scanner): ScannerDraft {
 
 function formatNumber(value: number | null | undefined): string {
   if (value == null || Number.isNaN(value)) return "—";
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(
+    value,
+  );
 }
 
 const warmSymbolColumns: TableColumn<WarmSymbol>[] = [
@@ -129,7 +135,6 @@ function draftMatchesScanner(scanner: Scanner, draft: ScannerDraft): boolean {
 
 export function ScannersPage() {
   const [scanners, setScanners] = useState<Scanner[]>([]);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -152,7 +157,9 @@ export function ScannersPage() {
   async function refreshDetail(id: string) {
     const data = await getScanner(id);
     setScanners((current) =>
-      current.map((scanner) => (scanner.id === id ? { ...scanner, ...data.scanner } : scanner)),
+      current.map((scanner) =>
+        scanner.id === id ? { ...scanner, ...data.scanner } : scanner,
+      ),
     );
   }
 
@@ -181,7 +188,8 @@ export function ScannersPage() {
     const active = scanners.find(
       (scanner) =>
         scanner.activeRun &&
-        (scanner.activeRun.status === "queued" || scanner.activeRun.status === "running"),
+        (scanner.activeRun.status === "queued" ||
+          scanner.activeRun.status === "running"),
     );
 
     if (!active?.activeRun) return;
@@ -204,7 +212,9 @@ export function ScannersPage() {
 
           setScanners((current) =>
             current.map((scanner) =>
-              scanner.id === scannerId ? { ...scanner, activeRun: run } : scanner,
+              scanner.id === scannerId
+                ? { ...scanner, activeRun: run }
+                : scanner,
             ),
           );
         } catch {
@@ -232,7 +242,9 @@ export function ScannersPage() {
       });
       setScanners((current) =>
         current.map((item) =>
-          item.id === scanner.id ? { ...item, ...updated, symbols: item.symbols } : item,
+          item.id === scanner.id
+            ? { ...item, ...updated, symbols: item.symbols }
+            : item,
         ),
       );
     } catch (err) {
@@ -263,7 +275,9 @@ export function ScannersPage() {
       saveExchangeOpenHours(scanner.code, openHours);
       setScanners((current) =>
         current.map((item) =>
-          item.id === scanner.id ? { ...item, ...updated, symbols: item.symbols } : item,
+          item.id === scanner.id
+            ? { ...item, ...updated, symbols: item.symbols }
+            : item,
         ),
       );
       setDrafts((current) => ({
@@ -290,26 +304,11 @@ export function ScannersPage() {
             : item,
         ),
       );
-      if (expandedId !== scanner.id) {
-        setExpandedId(scanner.id);
-      }
       await refreshDetail(scanner.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to start run");
     } finally {
       setBusyId(null);
-    }
-  }
-
-  async function handleExpand(scanner: Scanner) {
-    const next = expandedId === scanner.id ? null : scanner.id;
-    setExpandedId(next);
-    if (next) {
-      try {
-        await refreshDetail(scanner.id);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load symbols");
-      }
     }
   }
 
@@ -324,6 +323,139 @@ export function ScannersPage() {
       return `Last run ${formatDateTime(scanner.lastRunAt)} · ${scanner.lastRunMatched ?? 0} matched`;
     }
     return "Never run";
+  }
+
+  function patchDraft(scannerId: string, draft: ScannerDraft, patch: Partial<ScannerDraft>) {
+    setDrafts((current) => ({
+      ...current,
+      [scannerId]: { ...draft, ...patch },
+    }));
+  }
+
+  function sectionsFor(scanner: Scanner, draft: ScannerDraft): SectionsCardSection[] {
+    return [
+      {
+        id: "filters",
+        title: "Volume filters",
+        description: "Gate thresholds and how often this exchange re-screens.",
+        columns: [
+          <NumericInput
+            key="minAvgVolume10d"
+            label="Min 10d avg volume"
+            value={draft.minAvgVolume10d}
+            onChange={(event) =>
+              patchDraft(scanner.id, draft, {
+                minAvgVolume10d: event.target.value,
+              })
+            }
+          />,
+          <NumericInput
+            key="minApproxDailyValue"
+            label="Min approx daily value"
+            value={draft.minApproxDailyValue}
+            onChange={(event) =>
+              patchDraft(scanner.id, draft, {
+                minApproxDailyValue: event.target.value,
+              })
+            }
+          />,
+          <NumericInput
+            key="intervalHours"
+            label="Interval (hours)"
+            min={1}
+            step={1}
+            value={draft.intervalHours}
+            onChange={(event) =>
+              patchDraft(scanner.id, draft, {
+                intervalHours: event.target.value,
+              })
+            }
+          />,
+        ],
+      },
+      {
+        id: "hours",
+        title: "Open hours",
+        description:
+          "Cron skips Yahoo outside Mon–Fri open→close. Manual Run still works.",
+        columns: [
+          <label
+            key="timezone"
+            className="numeric-input"
+            htmlFor={`tz-${scanner.id}`}
+          >
+            <span className="numeric-input-label">Timezone</span>
+            <input
+              id={`tz-${scanner.id}`}
+              type="text"
+              value={draft.timezone}
+              onChange={(event) =>
+                patchDraft(scanner.id, draft, {
+                  timezone: event.target.value,
+                })
+              }
+              placeholder="America/New_York"
+            />
+          </label>,
+          <label
+            key="open"
+            className="numeric-input"
+            htmlFor={`open-${scanner.id}`}
+          >
+            <span className="numeric-input-label">Open (local)</span>
+            <input
+              id={`open-${scanner.id}`}
+              type="time"
+              value={draft.openLocal}
+              onChange={(event) =>
+                patchDraft(scanner.id, draft, {
+                  openLocal: event.target.value,
+                })
+              }
+            />
+          </label>,
+          <label
+            key="close"
+            className="numeric-input"
+            htmlFor={`close-${scanner.id}`}
+          >
+            <span className="numeric-input-label">Close (local)</span>
+            <input
+              id={`close-${scanner.id}`}
+              type="time"
+              value={draft.closeLocal}
+              onChange={(event) =>
+                patchDraft(scanner.id, draft, {
+                  closeLocal: event.target.value,
+                })
+              }
+            />
+          </label>,
+        ],
+      },
+      {
+        id: "gated",
+        title: "Gated symbols",
+        description: `${scanner.warmCount} currently warm from the last successful gate.`,
+        columns: [
+          <TableExpandableRows
+            key="symbols"
+            id={`scanners.warm-symbols.${scanner.code}`}
+            rows={scanner.symbols ?? []}
+            columns={warmSymbolColumns}
+            getRowId={(row) => row.id}
+            compact
+            initialSort={[{ columnId: "volume", direction: "desc" }]}
+            empty={
+              <p className="scanner-empty">
+                No gated symbols yet. Save filters and hit Run{" "}
+                {PRODUCT_NAMES.EVG}.
+              </p>
+            }
+          />,
+        ],
+      },
+    ];
   }
 
   return (
@@ -352,7 +484,6 @@ export function ScannersPage() {
       <div className="scanners-list">
         {scanners.map((scanner) => {
           const draft = drafts[scanner.id] ?? draftFromScanner(scanner);
-          const expanded = expandedId === scanner.id;
           const running =
             scanner.activeRun?.status === "queued" ||
             scanner.activeRun?.status === "running";
@@ -364,191 +495,87 @@ export function ScannersPage() {
           });
 
           return (
-            <article key={scanner.id} className="scanner-card">
-              <button
-                type="button"
-                className="scanner-card-header"
-                onClick={() => void handleExpand(scanner)}
-              >
-                <div className="scanner-card-title">
-                  <strong>
-                    {scanner.label} · {scanner.code}
-                  </strong>
-                  <div className="scanner-card-meta">
-                    <span className={`scanner-pill${scanner.enabled ? " is-on" : ""}`}>
-                      <AcronymLabel acronym="EVG" layout="inline" />{" "}
-                      {scanner.enabled ? "ON" : "OFF"}
-                    </span>
-                    <span
-                      className={`scanner-pill${sessionOpen ? " is-session-open" : ""}`}
-                    >
-                      {sessionOpen ? "Session open" : "Session closed"}
-                    </span>
-                    <span className={`scanner-pill${running ? " is-running" : ""}`}>
-                      {scanner.warmCount} gated
-                    </span>
-                    <span>{runLabel(scanner.activeRun, scanner)}</span>
-                  </div>
-                </div>
-                {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
-              </button>
-
-              {expanded ? (
-                <div className="scanner-card-body">
-                  <div className="scanner-fields">
-                    <NumericInput
-                      label="Min 10d avg volume"
-                      value={draft.minAvgVolume10d}
-                      onChange={(event) =>
-                        setDrafts((current) => ({
-                          ...current,
-                          [scanner.id]: {
-                            ...draft,
-                            minAvgVolume10d: event.target.value,
-                          },
-                        }))
-                      }
-                    />
-                    <NumericInput
-                      label="Min approx daily value"
-                      value={draft.minApproxDailyValue}
-                      onChange={(event) =>
-                        setDrafts((current) => ({
-                          ...current,
-                          [scanner.id]: {
-                            ...draft,
-                            minApproxDailyValue: event.target.value,
-                          },
-                        }))
-                      }
-                    />
-                    <NumericInput
-                      label="Interval (hours)"
-                      min={1}
-                      step={1}
-                      value={draft.intervalHours}
-                      onChange={(event) =>
-                        setDrafts((current) => ({
-                          ...current,
-                          [scanner.id]: {
-                            ...draft,
-                            intervalHours: event.target.value,
-                          },
-                        }))
-                      }
-                    />
-                    <label className="numeric-input" htmlFor={`tz-${scanner.id}`}>
-                      <span className="numeric-input-label">Timezone</span>
-                      <input
-                        id={`tz-${scanner.id}`}
-                        type="text"
-                        value={draft.timezone}
-                        onChange={(event) =>
-                          setDrafts((current) => ({
-                            ...current,
-                            [scanner.id]: {
-                              ...draft,
-                              timezone: event.target.value,
-                            },
-                          }))
-                        }
-                        placeholder="America/New_York"
-                      />
-                    </label>
-                    <label className="numeric-input" htmlFor={`open-${scanner.id}`}>
-                      <span className="numeric-input-label">Open (local)</span>
-                      <input
-                        id={`open-${scanner.id}`}
-                        type="time"
-                        value={draft.openLocal}
-                        onChange={(event) =>
-                          setDrafts((current) => ({
-                            ...current,
-                            [scanner.id]: {
-                              ...draft,
-                              openLocal: event.target.value,
-                            },
-                          }))
-                        }
-                      />
-                    </label>
-                    <label className="numeric-input" htmlFor={`close-${scanner.id}`}>
-                      <span className="numeric-input-label">Close (local)</span>
-                      <input
-                        id={`close-${scanner.id}`}
-                        type="time"
-                        value={draft.closeLocal}
-                        onChange={(event) =>
-                          setDrafts((current) => ({
-                            ...current,
-                            [scanner.id]: {
-                              ...draft,
-                              closeLocal: event.target.value,
-                            },
-                          }))
-                        }
-                      />
-                      <span className="numeric-input-help">
-                        Cron skips Yahoo outside Mon–Fri open→close. Manual Run
-                        still works.
-                      </span>
-                    </label>
-                  </div>
-
-                  <div className="scanner-actions">
-                    <Button
-                      variant="ghost"
-                      disabled={busyId === scanner.id}
-                      onClick={() => void handleToggle(scanner)}
-                    >
-                      Turn {PRODUCT_NAMES.EVG} {scanner.enabled ? "OFF" : "ON"}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      disabled={busyId === scanner.id || !settingsDirty}
-                      onClick={() => void handleSave(scanner)}
-                    >
-                      <Save size={16} strokeWidth={2.5} />
-                      Save settings
-                    </Button>
-                    <Button
-                      disabled={busyId === scanner.id || running}
-                      onClick={() => void handleRun(scanner)}
-                    >
-                      <Play size={16} strokeWidth={2.5} />
-                      {running ? "Running…" : `Run ${PRODUCT_NAMES.EVG}`}
-                    </Button>
-                    <p
-                      className={`scanner-status${
-                        scanner.lastRunStatus === "error" ? " is-error" : ""
-                      }`}
-                    >
-                      {scanner.enabled
-                        ? `Next run ${formatDateTime(scanner.nextRunAt)}`
-                        : "Scheduler idle"}
-                      {running
-                        ? ` · ${scanner.activeRun?.status} ${scanner.activeRun?.scanned ?? 0}/${scanner.activeRun?.matched ?? 0}`
-                        : ""}
-                    </p>
-                  </div>
-
-                  <TableExpandableRows
-                    id="scanners.warm-symbols"
-                    rows={scanner.symbols ?? []}
-                    columns={warmSymbolColumns}
-                    getRowId={(row) => row.id}
-                    compact
-                    initialSort={[{ columnId: "volume", direction: "desc" }]}
-                    empty={
-                      <p className="scanner-empty">
-                        No gated symbols yet. Save filters and hit Run{" "}
-                        {PRODUCT_NAMES.EVG}.
-                      </p>
-                    }
-                  />
-                </div>
-              ) : null}
-            </article>
+            <SectionsCard
+              key={scanner.id}
+              id={`evg.${scanner.code}`}
+              collapsible
+              defaultCollapsed
+              onExpand={() => {
+                if (scanner.symbols) return;
+                void refreshDetail(scanner.id).catch((err) => {
+                  setError(
+                    err instanceof Error
+                      ? err.message
+                      : "Failed to load symbols",
+                  );
+                });
+              }}
+              title={
+                <strong className="scanner-card-title-text">
+                  {scanner.label} · {scanner.code}
+                </strong>
+              }
+              meta={
+                <>
+                  <span
+                    className={`scanner-pill${scanner.enabled ? " is-on" : ""}`}
+                  >
+                    <AcronymLabel acronym="EVG" layout="inline" />{" "}
+                    {scanner.enabled ? "ON" : "OFF"}
+                  </span>
+                  <span
+                    className={`scanner-pill${sessionOpen ? " is-session-open" : ""}`}
+                  >
+                    {sessionOpen ? "Session open" : "Session closed"}
+                  </span>
+                  <span
+                    className={`scanner-pill${running ? " is-running" : ""}`}
+                  >
+                    {scanner.warmCount} gated
+                  </span>
+                  <span>{runLabel(scanner.activeRun, scanner)}</span>
+                </>
+              }
+              sections={sectionsFor(scanner, draft)}
+              footer={
+                <>
+                  <Button
+                    variant="ghost"
+                    disabled={busyId === scanner.id}
+                    onClick={() => void handleToggle(scanner)}
+                  >
+                    Turn {PRODUCT_NAMES.EVG} {scanner.enabled ? "OFF" : "ON"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    disabled={busyId === scanner.id || !settingsDirty}
+                    onClick={() => void handleSave(scanner)}
+                  >
+                    <Save size={16} strokeWidth={2.5} />
+                    Save settings
+                  </Button>
+                  <Button
+                    disabled={busyId === scanner.id || running}
+                    onClick={() => void handleRun(scanner)}
+                  >
+                    <Play size={16} strokeWidth={2.5} />
+                    {running ? "Running…" : `Run ${PRODUCT_NAMES.EVG}`}
+                  </Button>
+                  <p
+                    className={`scanner-status${
+                      scanner.lastRunStatus === "error" ? " is-error" : ""
+                    }`}
+                  >
+                    {scanner.enabled
+                      ? `Next run ${formatDateTime(scanner.nextRunAt)}`
+                      : "Scheduler idle"}
+                    {running
+                      ? ` · ${scanner.activeRun?.status} ${scanner.activeRun?.scanned ?? 0}/${scanner.activeRun?.matched ?? 0}`
+                      : ""}
+                  </p>
+                </>
+              }
+            />
           );
         })}
       </div>
