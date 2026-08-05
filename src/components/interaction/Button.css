@@ -42,10 +42,42 @@
   border-color: var(--text-dim);
 }
 
+/** Borderless — compact table / inline icon actions. */
+.btn-plain {
+  background: transparent;
+  color: var(--text-muted);
+  border-color: transparent;
+  padding: 0.35rem 0.55rem;
+}
+
+.btn-plain:hover {
+  background: var(--bg-muted);
+  color: var(--text);
+}
+
+.btn-tone-danger {
+  color: var(--danger);
+}
+
+.btn-tone-danger:hover {
+  color: var(--danger);
+  background: var(--danger-soft);
+  border-color: transparent;
+}
+
+.btn-ghost.btn-tone-danger:hover {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border-strong));
+}
+
 .btn-icon {
   width: 2.5rem;
   height: 2.5rem;
   padding: 0;
+}
+
+.btn-plain.btn-icon {
+  width: 1.7rem;
+  height: 1.7rem;
 }
 
 .btn:disabled {

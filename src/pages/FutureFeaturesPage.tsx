@@ -574,14 +574,15 @@ export function FutureFeaturesPage() {
                   ) : null}
                   <span className="ff-topline-cell">
                     <Button
-                      variant="ghost"
+                      variant="plain"
+                      tone="danger"
                       iconOnly
                       className="ff-topline-btn"
                       aria-label="Remove"
                       disabled={busy || creating}
                       onClick={() => handleDelete(feature.id)}
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={14} strokeWidth={2.25} />
                     </Button>
                   </span>
                 </div>

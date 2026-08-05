@@ -192,14 +192,6 @@
   color: var(--text);
 }
 
-.swatch-row-remove {
-  color: var(--text-muted);
-}
-
-.swatch-row-remove:hover {
-  color: var(--danger);
-}
-
 .swatch-atr-triggers {
   display: flex;
   flex-direction: column;

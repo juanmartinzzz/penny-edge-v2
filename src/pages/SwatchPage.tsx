@@ -562,7 +562,8 @@ export function SwatchPage() {
                     limit={4}
                   />
                   <Button
-                    variant="ghost"
+                    variant="plain"
+                    tone="danger"
                     className="swatch-atr-trigger-remove"
                     disabled={busy}
                     onClick={() =>
@@ -574,7 +575,7 @@ export function SwatchPage() {
                       })
                     }
                   >
-                    <Trash2 size={16} strokeWidth={2.5} />
+                    <Trash2 size={14} strokeWidth={2.25} />
                     Remove level
                   </Button>
                 </div>
@@ -707,9 +708,9 @@ export function SwatchPage() {
       accessor: (row) => row.id,
       cell: (row) => (
         <Button
-          variant="ghost"
+          variant="plain"
+          tone="danger"
           iconOnly
-          className="swatch-row-remove"
           disabled={busy}
           aria-label={`Remove ${row.symbol} from SWATCH`}
           title={`Remove ${row.symbol}`}
@@ -718,7 +719,7 @@ export function SwatchPage() {
             void handleDeleteAsset(row);
           }}
         >
-          <Trash2 size={15} strokeWidth={2.5} />
+          <Trash2 size={14} strokeWidth={2.25} />
         </Button>
       ),
     },
@@ -1046,11 +1047,12 @@ export function SwatchPage() {
                         Save params
                       </Button>
                       <Button
-                        variant="ghost"
+                        variant="plain"
+                        tone="danger"
                         disabled={busy}
                         onClick={() => void handleDeleteAsset(row)}
                       >
-                        <Trash2 size={16} strokeWidth={2.5} />
+                        <Trash2 size={14} strokeWidth={2.25} />
                         Remove from {PRODUCT_NAMES.SWATCH}
                       </Button>
                     </div>
