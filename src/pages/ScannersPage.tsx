@@ -332,8 +332,44 @@ export function ScannersPage() {
     }));
   }
 
-  function sectionsFor(scanner: Scanner, draft: ScannerDraft): SectionsCardSection[] {
+  function sectionsFor(
+    scanner: Scanner,
+    draft: ScannerDraft,
+    opts: {
+      running: boolean;
+      settingsDirty: boolean;
+      sessionOpen: boolean;
+    },
+  ): SectionsCardSection[] {
+    const scheduleStatus = scanner.enabled
+      ? `Next run ${formatDateTime(scanner.nextRunAt)}`
+      : "Scheduler idle";
+    const runProgress = opts.running
+      ? ` · ${scanner.activeRun?.status} ${scanner.activeRun?.scanned ?? 0}/${scanner.activeRun?.matched ?? 0}`
+      : "";
+
     return [
+      {
+        id: "status",
+        title: "Status",
+        columns: [
+          <div key="status" className="scanner-status-row">
+            <span
+              className={`scanner-pill${opts.sessionOpen ? " is-market-open" : ""}`}
+            >
+              {opts.sessionOpen ? "Market open" : "Market closed"}
+            </span>
+            <span
+              className={`scanner-pill${opts.running ? " is-running" : ""}`}
+            >
+              {scanner.warmCount} gated
+            </span>
+            <span className="scanner-status-copy">
+              {runLabel(scanner.activeRun, scanner)}
+            </span>
+          </div>,
+        ],
+      },
       {
         id: "filters",
         title: "Volume filters",
@@ -455,6 +491,46 @@ export function ScannersPage() {
           />,
         ],
       },
+      {
+        id: "controls",
+        title: "Controls",
+        description: (
+          <span
+            className={
+              scanner.lastRunStatus === "error" ? "is-error" : undefined
+            }
+          >
+            {scheduleStatus}
+            {runProgress}
+          </span>
+        ),
+        columns: [
+          <div key="actions" className="scanner-actions">
+            <Button
+              variant="ghost"
+              disabled={busyId === scanner.id}
+              onClick={() => void handleToggle(scanner)}
+            >
+              Turn {scanner.enabled ? "off" : "on"}
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={busyId === scanner.id || !opts.settingsDirty}
+              onClick={() => void handleSave(scanner)}
+            >
+              <Save size={16} strokeWidth={2.5} />
+              Save settings
+            </Button>
+            <Button
+              disabled={busyId === scanner.id || opts.running}
+              onClick={() => void handleRun(scanner)}
+            >
+              <Play size={16} strokeWidth={2.5} />
+              {opts.running ? "Running…" : "Run"}
+            </Button>
+          </div>,
+        ],
+      },
     ];
   }
 
@@ -471,8 +547,9 @@ export function ScannersPage() {
         </h1>
         <p>
           Scheduled per-exchange volume gate. Symbols that clear the filters are
-          kept warm as each batch finishes. Cron waits for each exchange’s open
-          hours; TAS and SWATCH skip closed sessions too.
+          kept warm as each batch finishes. Cron waits for each exchange’s
+          market hours; TAS and SWATCH skip Yahoo calls when the market is
+          closed too.
         </p>
       </header>
 
@@ -499,7 +576,6 @@ export function ScannersPage() {
               key={scanner.id}
               id={`evg.${scanner.code}`}
               collapsible
-              defaultCollapsed
               onExpand={() => {
                 if (scanner.symbols) return;
                 void refreshDetail(scanner.id).catch((err) => {
@@ -511,70 +587,22 @@ export function ScannersPage() {
                 });
               }}
               title={
-                <strong className="scanner-card-title-text">
-                  {scanner.label} · {scanner.code}
-                </strong>
-              }
-              meta={
-                <>
+                <div className="scanner-card-title-row">
                   <span
                     className={`scanner-pill${scanner.enabled ? " is-on" : ""}`}
                   >
-                    <AcronymLabel acronym="EVG" layout="inline" />{" "}
                     {scanner.enabled ? "ON" : "OFF"}
                   </span>
-                  <span
-                    className={`scanner-pill${sessionOpen ? " is-session-open" : ""}`}
-                  >
-                    {sessionOpen ? "Session open" : "Session closed"}
-                  </span>
-                  <span
-                    className={`scanner-pill${running ? " is-running" : ""}`}
-                  >
-                    {scanner.warmCount} gated
-                  </span>
-                  <span>{runLabel(scanner.activeRun, scanner)}</span>
-                </>
+                  <strong className="scanner-card-title-text">
+                    {scanner.label} · {scanner.code}
+                  </strong>
+                </div>
               }
-              sections={sectionsFor(scanner, draft)}
-              footer={
-                <>
-                  <Button
-                    variant="ghost"
-                    disabled={busyId === scanner.id}
-                    onClick={() => void handleToggle(scanner)}
-                  >
-                    Turn {PRODUCT_NAMES.EVG} {scanner.enabled ? "OFF" : "ON"}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={busyId === scanner.id || !settingsDirty}
-                    onClick={() => void handleSave(scanner)}
-                  >
-                    <Save size={16} strokeWidth={2.5} />
-                    Save settings
-                  </Button>
-                  <Button
-                    disabled={busyId === scanner.id || running}
-                    onClick={() => void handleRun(scanner)}
-                  >
-                    <Play size={16} strokeWidth={2.5} />
-                    {running ? "Running…" : `Run ${PRODUCT_NAMES.EVG}`}
-                  </Button>
-                  <p
-                    className={`scanner-status${
-                      scanner.lastRunStatus === "error" ? " is-error" : ""
-                    }`}
-                  >
-                    {scanner.enabled
-                      ? `Next run ${formatDateTime(scanner.nextRunAt)}`
-                      : "Scheduler idle"}
-                    {running
-                      ? ` · ${scanner.activeRun?.status} ${scanner.activeRun?.scanned ?? 0}/${scanner.activeRun?.matched ?? 0}`
-                      : ""}
-                  </p>
-                </>
-              }
+              sections={sectionsFor(scanner, draft, {
+                running,
+                settingsDirty,
+                sessionOpen,
+              })}
             />
           );
         })}

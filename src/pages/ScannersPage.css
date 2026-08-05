@@ -37,6 +37,13 @@
   gap: 1rem;
 }
 
+.scanner-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
 .scanner-card-title-text {
   font-family: var(--font-display);
   font-size: 1.15rem;
@@ -69,7 +76,7 @@
   border-color: var(--text-muted);
 }
 
-.scanner-pill.is-session-open {
+.scanner-pill.is-market-open {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
   color: var(--text);
 }
@@ -85,6 +92,28 @@
   gap: 0.25rem;
 }
 
+.scanner-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+  align-items: center;
+}
+
+.scanner-status-copy {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-dim);
+}
+
+.scanner-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
 .scanner-status {
   font-family: var(--font-display);
   font-size: 0.85rem;
@@ -92,7 +121,8 @@
   color: var(--text-muted);
 }
 
-.scanner-status.is-error {
+.scanner-status.is-error,
+.sections-card-section-desc .is-error {
   color: var(--danger);
 }
 

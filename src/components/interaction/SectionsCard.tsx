@@ -36,10 +36,13 @@ type SectionsCardProps = {
   className?: string;
   /**
    * Collapse the whole body (all sections + footer) with one control in the chrome.
-   * Default false.
+   * Default false. When true, starts collapsed unless localStorage overrides.
    */
   collapsible?: boolean;
-  /** Initial card collapsed state when nothing is stored yet. Default true. */
+  /**
+   * Initial card collapsed state when nothing is stored yet.
+   * Only applies when `collapsible`. Default true (collapsed).
+   */
   defaultCollapsed?: boolean;
   /** Fires when a collapsible card becomes open (including initial open). */
   onExpand?: () => void;
