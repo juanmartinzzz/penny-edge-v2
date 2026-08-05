@@ -85,21 +85,10 @@
   gap: 0.75rem;
 }
 
-.swatch-add {
+.swatch-add-toggle {
   display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  padding: 1rem 1.1rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-elevated);
-}
-
-.swatch-add-title {
-  font-family: var(--font-display);
-  font-size: 0.95rem;
-  font-weight: 700;
-  margin: 0;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .swatch-add-hint {
@@ -113,6 +102,13 @@
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 0.75rem 1rem;
   align-items: end;
+}
+
+.swatch-add-atr {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  width: 100%;
 }
 
 .swatch-field {
@@ -137,13 +133,6 @@
   color: var(--text);
   padding: 0.55rem 0.7rem;
   font: inherit;
-}
-
-.swatch-add-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
 }
 
 .swatch-move {

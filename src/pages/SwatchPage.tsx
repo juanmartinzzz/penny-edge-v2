@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Play, Plus, Save, Trash2, Tv } from "lucide-react";
+import { Play, Plus, Save, Trash2, Tv, X } from "lucide-react";
 import { Button } from "../components/interaction/Button";
 import { NumericInput } from "../components/interaction/NumericInput";
 import { PillSelect } from "../components/interaction/PillSelect";
@@ -194,6 +194,7 @@ export function SwatchPage() {
     defaultsToDraft(loadSwatchFormDefaults(), "TOR"),
   );
   const [editDrafts, setEditDrafts] = useState<Record<string, DraftAsset>>({});
+  const [addingAsset, setAddingAsset] = useState(false);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -362,6 +363,17 @@ export function SwatchPage() {
     }
   }
 
+  function openAddAsset() {
+    setError(null);
+    setDraft(defaultsToDraft(formDefaults, draft.exchange || "TOR"));
+    setAddingAsset(true);
+  }
+
+  function cancelAddAsset() {
+    setAddingAsset(false);
+    setDraft(defaultsToDraft(formDefaults, draft.exchange || "TOR"));
+  }
+
   async function handleAdd() {
     setBusy(true);
     setError(null);
@@ -381,6 +393,7 @@ export function SwatchPage() {
       }
       await createSwatchAsset(payload);
       setDraft(defaultsToDraft(formDefaults, draft.exchange));
+      setAddingAsset(false);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add asset");
@@ -745,6 +758,117 @@ export function SwatchPage() {
     },
   ];
 
+  const addAssetSections: SectionsCardSection[] = [
+    {
+      id: "identity",
+      title: "Symbol & exchange",
+      description:
+        "Defaults for threshold, window, direction, cooldown, and total invested are remembered in this browser.",
+      columns: [
+        <div key="symbol" className="swatch-field">
+          <label htmlFor="swatch-symbol">Symbol</label>
+          <input
+            id="swatch-symbol"
+            type="text"
+            autoCapitalize="characters"
+            placeholder="SHOP"
+            value={draft.symbol}
+            onChange={(event) =>
+              setDraft((current) => ({
+                ...current,
+                symbol: event.target.value.toUpperCase(),
+              }))
+            }
+          />
+        </div>,
+        <PillSelect
+          key="exchange"
+          label="Exchange"
+          options={exchangeOptions}
+          value={draft.exchange}
+          onChange={(value) =>
+            setDraft((current) => ({ ...current, exchange: value }))
+          }
+          limit={3}
+        />,
+      ],
+    },
+    {
+      id: "variation",
+      title: "Variation alert",
+      description:
+        "Close-to-close % move over a short window, with direction and cooldown.",
+      columns: [
+        <NumericInput
+          key="thresholdPct"
+          label="Threshold %"
+          help="Alert when the close-to-close move clears this %."
+          min={0.1}
+          step={0.5}
+          value={draft.thresholdPct}
+          onChange={(event) =>
+            setDraft((current) => ({
+              ...current,
+              thresholdPct: event.target.value,
+            }))
+          }
+        />,
+        <NumericInput
+          key="windowHours"
+          label="Window (hours)"
+          help="Compare the latest hourly close to the close ~this many hours ago."
+          min={1}
+          step={1}
+          value={draft.windowHours}
+          onChange={(event) =>
+            setDraft((current) => ({
+              ...current,
+              windowHours: event.target.value,
+            }))
+          }
+        />,
+        <NumericInput
+          key="cooldownMinutes"
+          label="Cooldown (minutes)"
+          help="After a Telegram alert, stay quiet for this long even if still over threshold."
+          min={0}
+          step={5}
+          value={draft.cooldownMinutes}
+          onChange={(event) =>
+            setDraft((current) => ({
+              ...current,
+              cooldownMinutes: event.target.value,
+            }))
+          }
+        />,
+        <PillSelect
+          key="direction"
+          label="Direction"
+          options={DIRECTION_OPTIONS}
+          value={draft.direction}
+          onChange={(value) =>
+            setDraft((current) => ({
+              ...current,
+              direction: value as SwatchDirection,
+            }))
+          }
+          limit={4}
+        />,
+      ],
+    },
+    {
+      id: "atr",
+      title: "All-time return",
+      description:
+        "Optional. Shares + cost basis unlock ATR P&L / % trigger levels.",
+      columns: [
+        <div key="atr" className="swatch-add-atr">
+          {renderAtrFields(draft, (next) => setDraft(next))}
+        </div>,
+      ],
+    },
+  ];
+
   return (
     <motion.section
       className="swatch"
@@ -825,102 +949,45 @@ export function SwatchPage() {
             }
           />
 
-          <div className="swatch-add">
-            <h2 className="swatch-add-title">Add asset</h2>
-            <p className="swatch-add-hint">
-              Changing threshold / window / direction / cooldown / total invested
-              here updates the defaults remembered in this browser for the next
-              add.
-            </p>
-            <div className="swatch-add-fields">
-              <div className="swatch-field">
-                <label htmlFor="swatch-symbol">Symbol</label>
-                <input
-                  id="swatch-symbol"
-                  type="text"
-                  autoCapitalize="characters"
-                  placeholder="SHOP"
-                  value={draft.symbol}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      symbol: event.target.value.toUpperCase(),
-                    }))
-                  }
-                />
-              </div>
-              <NumericInput
-                label="Threshold %"
-                help="Alert when the close-to-close move clears this %."
-                min={0.1}
-                step={0.5}
-                value={draft.thresholdPct}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    thresholdPct: event.target.value,
-                  }))
-                }
-              />
-              <NumericInput
-                label="Window (hours)"
-                help="Compare the latest hourly close to the close ~this many hours ago."
-                min={1}
-                step={1}
-                value={draft.windowHours}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    windowHours: event.target.value,
-                  }))
-                }
-              />
-              <NumericInput
-                label="Cooldown (minutes)"
-                help="After a Telegram alert, stay quiet for this long even if still over threshold."
-                min={0}
-                step={5}
-                value={draft.cooldownMinutes}
-                onChange={(event) =>
-                  setDraft((current) => ({
-                    ...current,
-                    cooldownMinutes: event.target.value,
-                  }))
-                }
-              />
-            </div>
-            <PillSelect
-              label="Exchange"
-              options={exchangeOptions}
-              value={draft.exchange}
-              onChange={(value) =>
-                setDraft((current) => ({ ...current, exchange: value }))
+          {addingAsset ? (
+            <SectionsCard
+              id="swatch.add-asset"
+              title="Add asset"
+              meta={
+                <span>
+                  Fill variation params; ATR is optional. Submit adds to the
+                  watchlist.
+                </span>
               }
-              limit={4}
-            />
-            <PillSelect
-              label="Direction"
-              options={DIRECTION_OPTIONS}
-              value={draft.direction}
-              onChange={(value) =>
-                setDraft((current) => ({
-                  ...current,
-                  direction: value as SwatchDirection,
-                }))
+              sections={addAssetSections}
+              footer={
+                <>
+                  <Button
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={cancelAddAsset}
+                  >
+                    <X size={16} strokeWidth={2.5} />
+                    Cancel
+                  </Button>
+                  <Button
+                    disabled={busy || !draft.symbol.trim()}
+                    onClick={() => void handleAdd()}
+                  >
+                    <Plus size={16} strokeWidth={2.5} />
+                    Add to {PRODUCT_NAMES.SWATCH}
+                  </Button>
+                </>
               }
-              limit={4}
             />
-            {renderAtrFields(draft, (next) => setDraft(next))}
-            <div className="swatch-add-actions">
-              <Button
-                disabled={busy || !draft.symbol.trim()}
-                onClick={() => void handleAdd()}
-              >
+          ) : (
+            <div className="swatch-add-toggle">
+              <Button disabled={busy} onClick={openAddAsset}>
                 <Plus size={16} strokeWidth={2.5} />
-                Add to {PRODUCT_NAMES.SWATCH}
+                Add asset
               </Button>
             </div>
-          </div>
+          )}
 
           <div className="swatch-assets">
             <TableExpandableRows
@@ -932,7 +999,7 @@ export function SwatchPage() {
               initialSort={[{ columnId: "symbol", direction: "asc" }]}
               empty={
                 <p className="swatch-empty">
-                  No assets yet. Add an exchange + symbol above, then Check now.
+                  No assets yet. Use Add asset, then Check now.
                 </p>
               }
               renderExpanded={(row) => {
