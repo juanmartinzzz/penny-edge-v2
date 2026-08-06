@@ -63,7 +63,8 @@
   color: var(--text-muted);
 }
 
-.swatch-status.is-error {
+.swatch-status.is-error,
+.sections-card-section-desc .is-error {
   color: var(--danger);
 }
 
@@ -83,6 +84,59 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+.swatch-settings-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  min-width: 0;
+}
+
+.swatch-settings-title-text {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.swatch-settings-inline {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-dim);
+}
+
+.swatch-settings-inline.is-error {
+  color: var(--danger);
+}
+
+.swatch-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+  align-items: center;
+}
+
+.swatch-status-copy {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-dim);
+}
+
+.swatch-status-copy.is-error {
+  color: var(--danger);
+}
+
+.swatch-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .swatch-add-toggle {

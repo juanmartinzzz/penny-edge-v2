@@ -738,25 +738,71 @@ export function SwatchPage() {
     },
   ];
 
-  const scheduleSections: SectionsCardSection[] = [
-    {
-      id: "schedule",
-      title: "Global schedule",
-      description:
-        "One timer for the whole watchlist. Per-asset thresholds, windows, cooldowns, and ATR live on each row.",
-      columns: [
-        <NumericInput
-          key="intervalHours"
-          label="Check every (hours)"
-          help="How often SWATCH re-checks every enabled asset. Doesn’t change the % math — only when we look."
-          min={1}
-          step={1}
-          value={intervalHours}
-          onChange={(event) => setIntervalHours(event.target.value)}
-        />,
-      ],
-    },
-  ];
+  const scheduleSections: SectionsCardSection[] = overview
+    ? [
+        {
+          id: "status",
+          title: "Status",
+          columns: [
+            <div key="status" className="swatch-status-row">
+              <span className={`swatch-pill${running ? " is-running" : ""}`}>
+                {overview.enabledCount}/{overview.assetCount} watching
+              </span>
+              <span className="swatch-status-copy">
+                {runLabel(overview.activeRun, overview)}
+              </span>
+            </div>,
+          ],
+        },
+        {
+          id: "schedule",
+          title: "Global schedule",
+          description:
+            "One timer for the whole watchlist. Per-asset thresholds, windows, cooldowns, and ATR live on each row.",
+          columns: [
+            <NumericInput
+              key="intervalHours"
+              label="Check every (hours)"
+              help="How often SWATCH re-checks every enabled asset. Doesn’t change the % math — only when we look."
+              min={1}
+              step={1}
+              value={intervalHours}
+              onChange={(event) => setIntervalHours(event.target.value)}
+            />,
+          ],
+        },
+        {
+          id: "controls",
+          title: "Controls",
+          columns: [
+            <div key="actions" className="swatch-settings-actions">
+              <Button
+                variant="ghost"
+                disabled={busy}
+                onClick={() => void handleToggle()}
+              >
+                Turn {overview.config.enabled ? "off" : "on"}
+              </Button>
+              <Button
+                variant="ghost"
+                disabled={busy || !scheduleDirty}
+                onClick={() => void handleSaveSchedule()}
+              >
+                <Save size={16} strokeWidth={2.5} />
+                Save schedule
+              </Button>
+              <Button
+                disabled={busy || running}
+                onClick={() => void handleRun()}
+              >
+                <Play size={16} strokeWidth={2.5} />
+                {running ? "Checking…" : "Check now"}
+              </Button>
+            </div>,
+          ],
+        },
+      ]
+    : [];
 
   const addAssetSections: SectionsCardSection[] = [
     {
@@ -895,58 +941,29 @@ export function SwatchPage() {
         <>
           <SectionsCard
             id="swatch.settings"
-            meta={
-              <>
+            collapsible
+            title={
+              <div className="swatch-settings-title-row">
                 <span
                   className={`swatch-pill${overview.config.enabled ? " is-on" : ""}`}
                 >
                   {overview.config.enabled ? "ON" : "OFF"}
                 </span>
-                <span className={`swatch-pill${running ? " is-running" : ""}`}>
-                  {overview.enabledCount}/{overview.assetCount} watching
-                </span>
-                <span>{runLabel(overview.activeRun, overview)}</span>
+                <strong className="swatch-settings-title-text">Settings</strong>
                 <span
                   className={
                     overview.config.lastRunStatus === "error"
-                      ? "is-error"
-                      : undefined
+                      ? "swatch-settings-inline is-error"
+                      : "swatch-settings-inline"
                   }
                 >
                   {overview.config.enabled
-                    ? `Next run ${formatDateTime(overview.config.nextRunAt)}`
+                    ? `Next ${formatDateTime(overview.config.nextRunAt)}`
                     : "Scheduler idle"}
                 </span>
-              </>
+              </div>
             }
             sections={scheduleSections}
-            footer={
-              <>
-                <Button
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => void handleToggle()}
-                >
-                  Turn {PRODUCT_NAMES.SWATCH}{" "}
-                  {overview.config.enabled ? "OFF" : "ON"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  disabled={busy || !scheduleDirty}
-                  onClick={() => void handleSaveSchedule()}
-                >
-                  <Save size={16} strokeWidth={2.5} />
-                  Save schedule
-                </Button>
-                <Button
-                  disabled={busy || running}
-                  onClick={() => void handleRun()}
-                >
-                  <Play size={16} strokeWidth={2.5} />
-                  {running ? "Checking…" : "Check now"}
-                </Button>
-              </>
-            }
           />
 
           {addingAsset ? (
