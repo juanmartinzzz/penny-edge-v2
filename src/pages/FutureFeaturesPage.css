@@ -303,12 +303,64 @@
   background: color-mix(in srgb, var(--bg-elevated) 90%, transparent);
 }
 
-.ff-body-card p {
+.ff-body-card-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.ff-body-line {
   margin: 0;
-  white-space: pre-wrap;
+}
+
+.ff-body-copy,
+.ff-body-phrase {
   color: var(--text);
   font-size: 0.88rem;
   line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.ff-body-phrase {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ff-body-num {
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
+}
+
+.ff-body-num-index {
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 800;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  color: var(--text);
+}
+
+.ff-body-num .ff-body-phrase,
+.ff-body-num .ff-body-copy {
+  font-size: 0.9rem;
+}
+
+.ff-body-bullet {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+}
+
+.ff-body-bullet::before {
+  content: "";
+  width: 0.34rem;
+  height: 0.34rem;
+  margin-top: 0.48em;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: var(--text);
 }
 
 .ff-detail-payload {

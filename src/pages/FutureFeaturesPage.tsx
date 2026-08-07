@@ -16,6 +16,7 @@ import {
   type FutureFeatureTypeOption,
 } from "../lib/futureFeatures";
 import { formatDateTime } from "../lib/dates";
+import { FutureFeatureBodyCard } from "../lib/futureFeatureFormat";
 import "./FutureFeaturesPage.css";
 
 const CUSTOM_TYPE_VALUE = "__custom__";
@@ -194,7 +195,7 @@ function FeatureEditor({
             onChange={(e) =>
               onDraftChange((d) => ({ ...d, body: e.target.value }))
             }
-            placeholder="One idea per paragraph (blank line or new line → its own card)…"
+            placeholder="Cards: blank line between ideas. Short lines bold · - bullets · 1) big numbers…"
           />
         </label>
 
@@ -217,7 +218,7 @@ function FeatureEditor({
             onChange={(e) =>
               onDraftChange((d) => ({ ...d, executionNotes: e.target.value }))
             }
-            placeholder="One note per paragraph (blank line or new line → its own card)…"
+            placeholder="Same card formatting as body: short lines, - bullets, 1) numbers…"
           />
         </label>
 
@@ -605,12 +606,10 @@ export function FutureFeaturesPage() {
                           <h3>Body</h3>
                           <div className="ff-body-grid">
                             {bodyParagraphs(feature.body).map((paragraph, index) => (
-                              <article
+                              <FutureFeatureBodyCard
                                 key={`${feature.id}-p-${index}`}
-                                className="ff-body-card"
-                              >
-                                <p>{paragraph}</p>
-                              </article>
+                                paragraph={paragraph}
+                              />
                             ))}
                           </div>
                         </section>
@@ -635,12 +634,10 @@ export function FutureFeaturesPage() {
                           <div className="ff-body-grid">
                             {bodyParagraphs(feature.executionNotes).map(
                               (paragraph, index) => (
-                                <article
+                                <FutureFeatureBodyCard
                                   key={`${feature.id}-en-${index}`}
-                                  className="ff-body-card"
-                                >
-                                  <p>{paragraph}</p>
-                                </article>
+                                  paragraph={paragraph}
+                                />
                               ),
                             )}
                           </div>

@@ -1,0 +1,58 @@
+---
+description: Future feature body/notes text formatting conventions (auto bold, dots, cool numbering)
+globs: src/pages/FutureFeaturesPage.*,src/lib/futureFeatureFormat.tsx,src/lib/futureFeatures.ts
+alwaysApply: false
+---
+
+# Future feature card formatting
+
+Future-feature **body** and **execution notes** are plain text. The UI enhances each grid card via `src/lib/futureFeatureFormat.tsx`. Write content so those rules fire cleanly.
+
+## Split into cards
+
+- Blank line between paragraphs → separate cards (preferred)
+- If there are no blank lines, each non-empty line becomes its own card
+
+## Auto bold (short phrases)
+
+Short title-like lines render **bold**:
+
+- ≤ 6 words and ≤ 48 characters, or
+- Ends with `:` and ≤ 8 words / ≤ 60 characters
+
+Prefer short section labels (`Desired behavior:`, `UX notes`) on their own line. Do not rely on markdown `**bold**`.
+
+## Auto dots (bullets)
+
+Start a line with `-` or `*` (also `•` / en/em dash). The marker becomes a round dot; the rest of the line is the content.
+
+```
+- Keep separate run records
+* Surface failures clearly
+```
+
+## Cool numbering
+
+Start a line with `1)`, `1.`, `1-`, or `1:` (any integer). The number renders large and bold on its own line; the phrase sits on the next line (and auto-bolds when short).
+
+```
+1) Cron / schedule
+2) Manual runs
+```
+
+Put bullet details on following lines under that numbered heading (same card or the next card after a blank line).
+
+## Example shape
+
+```
+Keep processes separate — that stay intentional.
+
+Desired behavior:
+
+1) Cron / schedule
+- Run HIS right after successful TAS
+- Skip HIS when disabled
+
+2) Manual runs
+- Manual HIS always runs TAS first
+```
