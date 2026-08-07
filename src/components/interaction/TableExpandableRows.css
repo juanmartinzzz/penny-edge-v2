@@ -57,6 +57,67 @@
   border-bottom-color: transparent;
 }
 
+/* Data-row hover: full-row underline fade + focus beam on siblings */
+.ter-table tbody > .ter-data-row {
+  position: relative;
+  transition: opacity 180ms ease;
+}
+
+.ter-table tbody > .ter-data-row::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1.5px;
+  background: var(--text);
+  opacity: 0;
+  transition: opacity 180ms ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ter-table tbody > .ter-data-row:hover::after,
+.ter-table tbody > .ter-data-row:has(+ .ter-expanded-row:hover)::after {
+  opacity: 1;
+}
+
+.ter-table tbody:has(> .ter-data-row:hover, > .ter-expanded-row:hover)
+  > .ter-data-row:not(:hover):not(:has(+ .ter-expanded-row:hover)) {
+  opacity: 0.66;
+}
+
+.ter-table tbody:has(> .ter-data-row:hover, > .ter-expanded-row:hover)
+  > .ter-expanded-row {
+  transition: opacity 180ms ease;
+  opacity: 0.66;
+}
+
+.ter-table tbody > .ter-data-row:hover + .ter-expanded-row,
+.ter-table tbody > .ter-expanded-row:hover {
+  opacity: 1;
+}
+
+.ter-table tbody > .ter-data-row:has(+ .ter-expanded-row:hover) {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ter-table tbody > .ter-data-row::after {
+    transition: none;
+  }
+
+  .ter-table tbody > .ter-data-row:hover::after,
+  .ter-table tbody > .ter-data-row:has(+ .ter-expanded-row:hover)::after {
+    opacity: 1;
+  }
+
+  .ter-table tbody > .ter-data-row,
+  .ter-table tbody > .ter-expanded-row {
+    transition: none;
+  }
+}
+
 .ter-sort-btn {
   display: inline-flex;
   align-items: center;

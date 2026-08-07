@@ -346,7 +346,14 @@ export function TableExpandableRows<T>({
 
               return (
                 <Fragment key={rowId}>
-                  <tr className={isExpanded ? "is-expanded" : undefined}>
+                  <tr
+                    className={[
+                      "ter-data-row",
+                      isExpanded ? "is-expanded" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
                     {expandable ? (
                       <td className="ter-expand-col">
                         <button
