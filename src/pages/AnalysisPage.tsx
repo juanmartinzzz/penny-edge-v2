@@ -337,6 +337,7 @@ export function AnalysisPage() {
         <>
           <SectionsCard
             id="tas.settings"
+            collapsible
             meta={
               <>
                 <span className={`analysis-pill${overview.config.enabled ? " is-on" : ""}`}>

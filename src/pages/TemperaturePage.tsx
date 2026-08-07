@@ -510,6 +510,7 @@ export function TemperaturePage() {
         <>
           <SectionsCard
             id="his.settings"
+            collapsible
             meta={
               <>
                 <span
