@@ -5,6 +5,10 @@
   min-height: 100%;
 }
 
+.app-shell.is-mobile {
+  grid-template-columns: 1fr;
+}
+
 .app-sidebar-slot {
   height: 100%;
 }
@@ -38,20 +42,11 @@
   padding: 0.75rem 1.75rem 2rem;
 }
 
-@media (max-width: 720px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
+.app-shell.is-mobile .app-content,
+.app-shell.is-mobile .app-topbar {
+  padding-inline: 1.15rem;
+}
 
-  .app-sidebar-slot {
-    position: fixed;
-    inset: 0 auto 0 0;
-    z-index: 20;
-    height: 100%;
-  }
-
-  .app-content,
-  .app-topbar {
-    padding-inline: 1.15rem;
-  }
+.app-shell.is-mobile .app-content {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
 }
