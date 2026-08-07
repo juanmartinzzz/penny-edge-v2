@@ -21,7 +21,7 @@
   --shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
   --danger: #ff8a8a;
   --danger-soft: color-mix(in srgb, var(--danger) 16%, transparent);
-  --success: #b8d8b8;
+  --success: #5ad68a;
   --warning: #e6c35c;
   --heat: #ff8f70;
   --bg-glow-1: #222222;
@@ -44,7 +44,7 @@
   --shadow: 0 12px 36px rgba(20, 20, 19, 0.08);
   --danger: #c23b3b;
   --danger-soft: color-mix(in srgb, var(--danger) 14%, transparent);
-  --success: #2f6b45;
+  --success: #1a7540;
   --warning: #9a7420;
   --heat: #c45a38;
   --bg-glow-1: #ddd9d0;

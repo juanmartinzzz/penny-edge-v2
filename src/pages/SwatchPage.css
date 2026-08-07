@@ -195,7 +195,7 @@
 }
 
 .swatch-move.is-up {
-  color: var(--accent);
+  color: var(--success);
 }
 
 .swatch-move.is-down {
