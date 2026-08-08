@@ -63,7 +63,11 @@ export interface WarmSymbolRow {
   price: number | null;
   change_percent: number | null;
   volume: number | null;
+  /** Today's activity in quote/$ (crypto notional or shares × price). */
+  volume_quote?: number | null;
   avg_volume_10d: number | null;
+  /** 10d average activity in quote/$ (crypto: 24h stand-in until real 10d). */
+  avg_volume_10d_quote?: number | null;
   avg_volume_3m: number | null;
   fifty_day_average: number | null;
   approx_daily_value: number | null;
@@ -106,6 +110,41 @@ export function approxDailyValue(quote: Quote): number | null {
   return (vol3m * fiftyDay) / 90;
 }
 
+function productOrNull(
+  a: number | null | undefined,
+  b: number | null | undefined,
+): number | null {
+  if (a == null || b == null) return null;
+  const value = a * b;
+  return Number.isFinite(value) ? value : null;
+}
+
+/** Today's traded value in quote currency / USD. */
+export function volumeQuote(quote: Quote): number | null {
+  if (
+    quote.dailyQuoteNotional != null &&
+    Number.isFinite(quote.dailyQuoteNotional)
+  ) {
+    return quote.dailyQuoteNotional;
+  }
+  return productOrNull(quote.volume, quote.price);
+}
+
+/**
+ * ~10d average traded value in quote currency / USD.
+ * Crypto phase 1: 24h venue notional stands in until multi-day averages exist.
+ */
+export function avgVolume10dQuote(quote: Quote): number | null {
+  if (
+    quote.dailyQuoteNotional != null &&
+    Number.isFinite(quote.dailyQuoteNotional)
+  ) {
+    return quote.dailyQuoteNotional;
+  }
+  const price = quote.price ?? quote.fiftyDayAverage ?? null;
+  return productOrNull(quote.averageVolume10d, price);
+}
+
 /** EVG volume gate: keep quotes that clear 10d avg volume + approx daily value. */
 export function passesWarmFilters(
   quote: Quote,
@@ -115,7 +154,12 @@ export function passesWarmFilters(
   },
 ): boolean {
   if (filters.minAvgVolume10d != null) {
-    const vol10d = quote.averageVolume10d ?? 0;
+    // Crypto (dailyQuoteNotional set): gate on quote-denominated 10d.
+    // Equities: gate on base/share averageVolume10d (existing thresholds).
+    const vol10d =
+      quote.dailyQuoteNotional != null
+        ? (avgVolume10dQuote(quote) ?? 0)
+        : (quote.averageVolume10d ?? 0);
     if (vol10d < filters.minAvgVolume10d) return false;
   }
 

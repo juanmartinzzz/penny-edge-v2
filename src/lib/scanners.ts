@@ -30,8 +30,13 @@ export type WarmSymbol = {
   name: string | null;
   price: number | null;
   changePercent: number | null;
+  /** Base/share units (coins or shares). */
   volume: number | null;
+  /** Today's activity in quote/$ . */
+  volumeQuote: number | null;
   avgVolume10d: number | null;
+  /** ~10d average activity in quote/$ . */
+  avgVolume10dQuote: number | null;
   avgVolume3m: number | null;
   fiftyDayAverage: number | null;
   approxDailyValue: number | null;

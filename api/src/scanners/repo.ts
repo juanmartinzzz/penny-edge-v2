@@ -230,7 +230,8 @@ export async function listWarmSymbols(
     .prepare(
       `SELECT
          id, scanner_id, symbol, exchange, name, price, change_percent,
-         volume, avg_volume_10d, avg_volume_3m, fifty_day_average,
+         volume, volume_quote, avg_volume_10d, avg_volume_10d_quote,
+         avg_volume_3m, fifty_day_average,
          approx_daily_value, currency, is_warm, last_seen_run_id, last_seen_at,
          analyzed_at, analysis_run_id, temperature, temperature_at,
          temperature_run_id, cobuta_alerted, created_at, updated_at
@@ -370,7 +371,9 @@ export async function upsertWarmSymbols(
     price: number | null;
     changePercent: number | null;
     volume: number | null;
+    volumeQuote: number | null;
     avgVolume10d: number | null;
+    avgVolume10dQuote: number | null;
     avgVolume3m: number | null;
     fiftyDayAverage: number | null;
     approxDailyValue: number | null;
@@ -386,17 +389,20 @@ export async function upsertWarmSymbols(
       .prepare(
         `INSERT INTO warm_symbols (
            id, scanner_id, symbol, exchange, name, price, change_percent,
-           volume, avg_volume_10d, avg_volume_3m, fifty_day_average,
+           volume, volume_quote, avg_volume_10d, avg_volume_10d_quote,
+           avg_volume_3m, fifty_day_average,
            approx_daily_value, currency, is_warm, last_seen_run_id,
            last_seen_at, created_at, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
          ON CONFLICT(scanner_id, symbol) DO UPDATE SET
            exchange = excluded.exchange,
            name = excluded.name,
            price = excluded.price,
            change_percent = excluded.change_percent,
            volume = excluded.volume,
+           volume_quote = excluded.volume_quote,
            avg_volume_10d = excluded.avg_volume_10d,
+           avg_volume_10d_quote = excluded.avg_volume_10d_quote,
            avg_volume_3m = excluded.avg_volume_3m,
            fifty_day_average = excluded.fifty_day_average,
            approx_daily_value = excluded.approx_daily_value,
@@ -415,7 +421,9 @@ export async function upsertWarmSymbols(
         row.price,
         row.changePercent,
         row.volume,
+        row.volumeQuote,
         row.avgVolume10d,
+        row.avgVolume10dQuote,
         row.avgVolume3m,
         row.fiftyDayAverage,
         row.approxDailyValue,

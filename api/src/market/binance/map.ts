@@ -61,6 +61,9 @@ export function mapCoinGeckoTickerToQuote(
     return null;
   }
 
+  const safeBase =
+    baseVolume != null && Number.isFinite(baseVolume) ? baseVolume : null;
+
   return {
     symbol,
     exchange: BINANCE_EXCHANGE_CODE,
@@ -68,10 +71,11 @@ export function mapCoinGeckoTickerToQuote(
     price: price != null && Number.isFinite(price) ? price : null,
     change: null,
     changePercent: null,
-    volume: baseVolume != null && Number.isFinite(baseVolume) ? baseVolume : null,
-    // Phase 1: 24h venue notional as stand-in for 10d / 3m averages (no klines).
-    averageVolume10d: dailyQuoteNotional,
-    averageVolume3m: dailyQuoteNotional,
+    // Base units — quote/$ activity lives on dailyQuoteNotional / volumeQuote().
+    volume: safeBase,
+    // Phase 1: 24h base volume as stand-in for 10d / 3m averages (no klines).
+    averageVolume10d: safeBase,
+    averageVolume3m: safeBase,
     fiftyDayAverage: price != null && Number.isFinite(price) ? price : null,
     dailyQuoteNotional,
     currency: target,

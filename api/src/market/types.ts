@@ -23,8 +23,9 @@ export interface Quote {
   averageVolume3m?: number | null;
   fiftyDayAverage?: number | null;
   /**
-   * Average daily quote-asset notional (e.g. USDT). When set, EVG uses this
-   * for approx daily value instead of the equity (vol × price) / 90 heuristic.
+   * Average daily quote-asset notional (e.g. USDT / USD). When set, EVG uses
+   * this for quote-volume gates and approx daily value instead of equity
+   * share×price heuristics.
    */
   dailyQuoteNotional?: number | null;
   marketCap?: number | null;

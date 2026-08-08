@@ -54,7 +54,9 @@ export type AnalysisSymbol = {
   price: number | null;
   changePercent: number | null;
   volume: number | null;
+  volumeQuote: number | null;
   avgVolume10d: number | null;
+  avgVolume10dQuote: number | null;
   avgVolume3m: number | null;
   fiftyDayAverage: number | null;
   approxDailyValue: number | null;

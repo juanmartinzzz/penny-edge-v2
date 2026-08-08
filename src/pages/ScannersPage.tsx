@@ -35,6 +35,10 @@ import {
 import { PillSelect } from "../components/interaction/PillSelect";
 import { PRODUCT_NAMES } from "../lib/productNames";
 import { formatDateTime } from "../lib/dates";
+import {
+  formatAdaptiveNumber,
+  formatFixedNumber,
+} from "../lib/formatNumber";
 import { logJobFailure, reportUiError } from "../lib/reportError";
 import "./ScannersPage.css";
 
@@ -81,11 +85,13 @@ function draftFromScanner(scanner: Scanner): ScannerDraft {
   };
 }
 
-function formatNumber(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return "—";
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(
-    value,
-  );
+function formatQuoteAmount(
+  value: number | null | undefined,
+  currency: string | null | undefined,
+): string {
+  const formatted = formatFixedNumber(value);
+  if (formatted === "—" || !currency?.trim()) return formatted;
+  return `${formatted} ${currency.trim()}`;
 }
 
 const warmSymbolColumns: TableColumn<WarmSymbol>[] = [
@@ -99,35 +105,35 @@ const warmSymbolColumns: TableColumn<WarmSymbol>[] = [
     header: "Price",
     align: "right",
     accessor: (row) => row.price,
-    cell: (row) => formatNumber(row.price),
+    cell: (row) => formatAdaptiveNumber(row.price),
   },
   {
     id: "changePercent",
     header: "Chg %",
     align: "right",
     accessor: (row) => row.changePercent,
-    cell: (row) => formatNumber(row.changePercent),
+    cell: (row) => formatFixedNumber(row.changePercent),
   },
   {
-    id: "volume",
-    header: "Vol",
+    id: "volumeQuote",
+    header: "Quote vol",
     align: "right",
-    accessor: (row) => row.volume,
-    cell: (row) => formatNumber(row.volume),
+    accessor: (row) => row.volumeQuote,
+    cell: (row) => formatQuoteAmount(row.volumeQuote, row.currency),
   },
   {
-    id: "avgVolume10d",
-    header: "10d vol",
+    id: "avgVolume10dQuote",
+    header: "10d quote vol",
     align: "right",
-    accessor: (row) => row.avgVolume10d,
-    cell: (row) => formatNumber(row.avgVolume10d),
+    accessor: (row) => row.avgVolume10dQuote,
+    cell: (row) => formatQuoteAmount(row.avgVolume10dQuote, row.currency),
   },
   {
     id: "approxDailyValue",
     header: "Approx value",
     align: "right",
     accessor: (row) => row.approxDailyValue,
-    cell: (row) => formatNumber(row.approxDailyValue),
+    cell: (row) => formatQuoteAmount(row.approxDailyValue, row.currency),
   },
 ];
 
@@ -503,13 +509,15 @@ export function ScannersPage() {
         id: "filters",
         title: "Volume filters",
         description: binance
-          ? "Gate thresholds in quote notional (e.g. USDT) and how often this exchange re-screens."
-          : "Gate thresholds and how often this exchange re-screens.",
+          ? "Gate on quote-asset notional (e.g. USDT). Base coin volume is stored but not shown."
+          : "10d filter is share volume; table columns show quote/$ activity (shares × price).",
         columns: [
           <NumericInput
             key="minAvgVolume10d"
             label={
-              binance ? "Min 10d avg quote volume" : "Min 10d avg volume"
+              binance
+                ? "Min 10d avg quote volume"
+                : "Min 10d avg volume (shares)"
             }
             value={draft.minAvgVolume10d}
             onChange={(event) =>
@@ -635,7 +643,7 @@ export function ScannersPage() {
             columns={warmSymbolColumns}
             getRowId={(row) => row.id}
             compact
-            initialSort={[{ columnId: "volume", direction: "desc" }]}
+            initialSort={[{ columnId: "volumeQuote", direction: "desc" }]}
             empty={
               <p className="scanner-empty">
                 {opts.loadingSymbols
