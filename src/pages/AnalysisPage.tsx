@@ -24,13 +24,12 @@ import {
 } from "../lib/analysis";
 import { PRODUCT_NAMES } from "../lib/productNames";
 import { formatDateTime } from "../lib/dates";
+import {
+  formatAdaptiveNumber,
+  formatFixedNumber,
+} from "../lib/formatNumber";
 import { logJobFailure, reportUiError } from "../lib/reportError";
 import "./AnalysisPage.css";
-
-function formatNumber(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value)) return "—";
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
-}
 
 const symbolColumns: TableColumn<AnalysisSymbol>[] = [
   {
@@ -48,21 +47,23 @@ const symbolColumns: TableColumn<AnalysisSymbol>[] = [
     header: "Last",
     align: "right",
     accessor: (row) => row.analysis?.summary.lastClose ?? row.price,
-    cell: (row) => formatNumber(row.analysis?.summary.lastClose ?? row.price),
+    cell: (row) =>
+      formatAdaptiveNumber(row.analysis?.summary.lastClose ?? row.price),
   },
   {
     id: "vsAvg",
     header: "vs avg %",
     align: "right",
     accessor: (row) => row.analysis?.summary.closeVsLookbackAvgPct,
-    cell: (row) => formatNumber(row.analysis?.summary.closeVsLookbackAvgPct),
+    cell: (row) =>
+      formatFixedNumber(row.analysis?.summary.closeVsLookbackAvgPct),
   },
   {
     id: "rollingAvg",
     header: "Roll avg",
     align: "right",
     accessor: (row) => row.analysis?.summary.rollingAvgClose,
-    cell: (row) => formatNumber(row.analysis?.summary.rollingAvgClose),
+    cell: (row) => formatAdaptiveNumber(row.analysis?.summary.rollingAvgClose),
   },
   {
     id: "analyzedAt",

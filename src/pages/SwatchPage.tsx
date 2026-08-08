@@ -9,6 +9,7 @@ import {
   type SectionsCardSection,
 } from "../components/interaction/SectionsCard";
 import { AcronymLabel } from "../components/AcronymLabel";
+import { formatAdaptiveNumber } from "../lib/formatNumber";
 import {
   TableExpandableRows,
   type TableColumn,
@@ -1055,7 +1056,7 @@ export function SwatchPage() {
                           }`
                         : "never"}
                       {row.lastClose != null
-                        ? ` · last close ${formatNumber(row.lastClose)}`
+                        ? ` · last close ${formatAdaptiveNumber(row.lastClose)}`
                         : ""}
                       {row.lastAtrPct != null
                         ? ` · ATR ${formatNumber(row.lastAtrPct, 1)}%`
