@@ -1,21 +1,16 @@
-/** Binance spot exchange code used in EVG / warm_symbols / SWATCH. */
+/** Binance.US spot exchange code used in EVG / warm_symbols / SWATCH. */
 export const BINANCE_EXCHANGE_CODE = "BINANCE";
 
 /**
- * Quote assets offered as EVG multi-select pills.
- * Only USDT is enabled by default on the Binance scanner seed.
+ * Quote assets offered as EVG multi-select pills for Binance.US.
+ * Live universe is mainly USDT / USD (plus sparse USDC / BTC).
+ * Only USDT is enabled by default on the scanner seed.
  */
 export const BINANCE_QUOTE_ASSET_OPTIONS = [
   "USDT",
+  "USD",
   "USDC",
   "BTC",
-  "ETH",
-  "BNB",
-  "FDUSD",
-  "EUR",
-  "TRY",
-  "BRL",
-  "JPY",
 ] as const;
 
 export type BinanceQuoteAsset = (typeof BINANCE_QUOTE_ASSET_OPTIONS)[number];

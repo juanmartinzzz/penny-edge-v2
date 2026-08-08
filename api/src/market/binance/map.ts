@@ -1,11 +1,8 @@
 import type { Bar, Interval, Quote, Range } from "../types";
 import { BINANCE_EXCHANGE_CODE } from "./constants";
 
-/** Prefer market-data-only host; fall back to api.binance.com if blocked. */
-export const BINANCE_REST_BASES = [
-  "https://data-api.binance.vision",
-  "https://api.binance.com",
-] as const;
+/** Binance.US public REST — reachable from Cloudflare Worker egress. */
+export const BINANCE_REST_BASES = ["https://api.binance.us"] as const;
 
 /** @deprecated use BINANCE_REST_BASES */
 export const BINANCE_REST_BASE = BINANCE_REST_BASES[0];

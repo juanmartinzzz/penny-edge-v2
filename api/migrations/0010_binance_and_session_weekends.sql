@@ -5,7 +5,7 @@ ALTER TABLE exchange_scanners ADD COLUMN include_weekends INTEGER NOT NULL DEFAU
 -- NULL for equity scanners (ignored).
 ALTER TABLE exchange_scanners ADD COLUMN enabled_quote_assets TEXT;
 
--- Binance EVG scanner: equity-like hours by default; USDT quote market only.
+-- Binance.US EVG scanner: equity-like hours by default; USDT quote market only.
 INSERT OR IGNORE INTO exchange_scanners (
   id, code, label, enabled, interval_hours,
   min_avg_volume_10d, min_approx_daily_value,
@@ -15,7 +15,7 @@ INSERT OR IGNORE INTO exchange_scanners (
 ) VALUES (
   'binance',
   'BINANCE',
-  'Binance',
+  'Binance.US',
   0,
   24,
   7777,

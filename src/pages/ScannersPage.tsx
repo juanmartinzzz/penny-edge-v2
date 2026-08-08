@@ -435,7 +435,7 @@ export function ScannersPage() {
         id: "quotes",
         title: "Quote markets",
         description:
-          "Only pairs priced in these quote assets are screened. TAS follows gated symbols.",
+          "Only pairs priced in these Binance.US quote assets are screened. TAS follows gated symbols.",
         columns: [
           <PillSelect
             key="quoteAssets"
