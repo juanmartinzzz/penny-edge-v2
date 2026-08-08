@@ -1,6 +1,6 @@
-export type ProviderId = "yahoo" | (string & {});
+export type ProviderId = "yahoo" | "binance" | (string & {});
 
-export type Exchange = "US" | "TO" | "V" | string;
+export type Exchange = "US" | "TO" | "V" | "BINANCE" | string;
 
 export type Interval = "1m" | "5m" | "15m" | "1h" | "1d" | "1wk" | "1mo";
 
@@ -22,6 +22,11 @@ export interface Quote {
   averageVolume10d?: number | null;
   averageVolume3m?: number | null;
   fiftyDayAverage?: number | null;
+  /**
+   * Average daily quote-asset notional (e.g. USDT). When set, EVG uses this
+   * for approx daily value instead of the equity (vol × price) / 90 heuristic.
+   */
+  dailyQuoteNotional?: number | null;
   marketCap?: number | null;
   currency?: string;
   asOf: string;
@@ -48,6 +53,8 @@ export interface ScreenerQuery {
   exchange: Exchange;
   offset?: number;
   limit?: number;
+  /** Binance: only pairs whose quoteAsset is in this list (e.g. ["USDT"]). */
+  quoteAssets?: string[];
 }
 
 export interface ProviderAuthStatus {

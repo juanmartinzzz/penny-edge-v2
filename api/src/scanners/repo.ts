@@ -12,12 +12,13 @@ export async function listScanners(db: D1Database): Promise<ExchangeScannerRow[]
     .prepare(
       `SELECT * FROM exchange_scanners
        ORDER BY CASE code
-         WHEN 'TOR' THEN 1
-         WHEN 'VAN' THEN 2
-         WHEN 'NYQ' THEN 3
-         WHEN 'NMS' THEN 4
-         WHEN 'ASE' THEN 5
-         WHEN 'PCX' THEN 6
+         WHEN 'BINANCE' THEN 1
+         WHEN 'TOR' THEN 2
+         WHEN 'VAN' THEN 3
+         WHEN 'NYQ' THEN 4
+         WHEN 'NMS' THEN 5
+         WHEN 'ASE' THEN 6
+         WHEN 'PCX' THEN 7
          ELSE 99
        END`,
     )
@@ -46,6 +47,8 @@ export async function updateScanner(
     timezone?: string;
     open_local?: string;
     close_local?: string;
+    include_weekends?: number;
+    enabled_quote_assets?: string | null;
     next_run_at?: string | null;
     last_run_at?: string | null;
     last_run_status?: string | null;
@@ -71,6 +74,14 @@ export async function updateScanner(
   const timezone = patch.timezone ?? current.timezone;
   const openLocal = patch.open_local ?? current.open_local;
   const closeLocal = patch.close_local ?? current.close_local;
+  const includeWeekends =
+    patch.include_weekends !== undefined
+      ? patch.include_weekends
+      : (current.include_weekends ?? 0);
+  const enabledQuoteAssets =
+    patch.enabled_quote_assets !== undefined
+      ? patch.enabled_quote_assets
+      : (current.enabled_quote_assets ?? null);
   const nextRunAt =
     patch.next_run_at !== undefined ? patch.next_run_at : current.next_run_at;
   const lastRunAt =
@@ -102,6 +113,8 @@ export async function updateScanner(
          timezone = ?,
          open_local = ?,
          close_local = ?,
+         include_weekends = ?,
+         enabled_quote_assets = ?,
          next_run_at = ?,
          last_run_at = ?,
          last_run_status = ?,
@@ -119,6 +132,8 @@ export async function updateScanner(
       timezone,
       openLocal,
       closeLocal,
+      includeWeekends,
+      enabledQuoteAssets,
       nextRunAt,
       lastRunAt,
       lastRunStatus,
@@ -136,27 +151,45 @@ export async function updateScanner(
 /** code → session hours for TAS / SWATCH gates. */
 export async function listExchangeSessions(
   db: D1Database,
-): Promise<Map<string, { timezone: string; openLocal: string; closeLocal: string }>> {
+): Promise<
+  Map<
+    string,
+    {
+      timezone: string;
+      openLocal: string;
+      closeLocal: string;
+      includeWeekends: boolean;
+    }
+  >
+> {
   const result = await db
     .prepare(
-      `SELECT code, timezone, open_local, close_local FROM exchange_scanners`,
+      `SELECT code, timezone, open_local, close_local, include_weekends
+       FROM exchange_scanners`,
     )
     .all<{
       code: string;
       timezone: string;
       open_local: string;
       close_local: string;
+      include_weekends: number;
     }>();
 
   const map = new Map<
     string,
-    { timezone: string; openLocal: string; closeLocal: string }
+    {
+      timezone: string;
+      openLocal: string;
+      closeLocal: string;
+      includeWeekends: boolean;
+    }
   >();
   for (const row of result.results ?? []) {
     map.set(row.code, {
       timezone: row.timezone,
       openLocal: row.open_local,
       closeLocal: row.close_local,
+      includeWeekends: Boolean(row.include_weekends),
     });
   }
   return map;

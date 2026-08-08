@@ -6,14 +6,18 @@ import {
   BUILTIN_EXCHANGE_HOURS,
   type ExchangeSession,
   isExchangeSessionOpen,
+  isValidCloseHhmm,
   isValidHhmm,
+  isValidOpenHhmm,
 } from "../../shared/exchangeHours";
 
 export type { ExchangeSession };
 export {
   BUILTIN_EXCHANGE_HOURS,
   isExchangeSessionOpen,
+  isValidCloseHhmm,
   isValidHhmm,
+  isValidOpenHhmm,
 };
 
 const STORAGE_KEY = "penny-edge.evg.open-hours";
@@ -41,6 +45,7 @@ export function loadExchangeOpenHours(code: string): ExchangeSession {
     timezone: "America/New_York",
     openLocal: "09:30",
     closeLocal: "16:00",
+    includeWeekends: false,
   };
   const stored = readStore()[code];
   if (!stored) return { ...base };
@@ -50,15 +55,19 @@ export function loadExchangeOpenHours(code: string): ExchangeSession {
       ? stored.timezone.trim()
       : base.timezone;
   const openLocal =
-    typeof stored.openLocal === "string" && isValidHhmm(stored.openLocal)
+    typeof stored.openLocal === "string" && isValidOpenHhmm(stored.openLocal)
       ? stored.openLocal.trim()
       : base.openLocal;
   const closeLocal =
-    typeof stored.closeLocal === "string" && isValidHhmm(stored.closeLocal)
+    typeof stored.closeLocal === "string" && isValidCloseHhmm(stored.closeLocal)
       ? stored.closeLocal.trim()
       : base.closeLocal;
+  const includeWeekends =
+    typeof stored.includeWeekends === "boolean"
+      ? stored.includeWeekends
+      : base.includeWeekends;
 
-  return { timezone, openLocal, closeLocal };
+  return { timezone, openLocal, closeLocal, includeWeekends };
 }
 
 export function saveExchangeOpenHours(
@@ -70,6 +79,7 @@ export function saveExchangeOpenHours(
     timezone: session.timezone,
     openLocal: session.openLocal,
     closeLocal: session.closeLocal,
+    includeWeekends: session.includeWeekends,
   };
   writeStore(store);
 }

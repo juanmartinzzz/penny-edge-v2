@@ -5,11 +5,17 @@
  */
 import {
   isExchangeSessionOpen,
-  isValidHhmm,
+  isValidCloseHhmm,
+  isValidOpenHhmm,
   parseHhmmToMinutes,
   sessionFromRow,
 } from "../../../shared/exchangeHours";
 import { createMarketDataService, type MarketEnv } from "../market/service";
+import {
+  isBinanceExchange,
+  parseEnabledQuoteAssets,
+  serializeEnabledQuoteAssets,
+} from "../market/binance/constants";
 import {
   clearStaleWarmSymbols,
   createRun,
@@ -92,6 +98,8 @@ export async function patchScanner(
     timezone?: string;
     openLocal?: string;
     closeLocal?: string;
+    includeWeekends?: boolean;
+    enabledQuoteAssets?: string[];
   },
 ) {
   const scanner = await getScanner(env.DB, scannerId);
@@ -126,15 +134,15 @@ export async function patchScanner(
   }
 
   if (body.openLocal !== undefined) {
-    if (!isValidHhmm(body.openLocal)) {
-      throw new Error("openLocal must be HH:MM (24h)");
+    if (!isValidOpenHhmm(body.openLocal)) {
+      throw new Error("openLocal must be HH:MM (00:00–23:59)");
     }
     patch.open_local = body.openLocal.trim();
   }
 
   if (body.closeLocal !== undefined) {
-    if (!isValidHhmm(body.closeLocal)) {
-      throw new Error("closeLocal must be HH:MM (24h)");
+    if (!isValidCloseHhmm(body.closeLocal)) {
+      throw new Error("closeLocal must be HH:MM (00:00–23:59 or 24:00)");
     }
     patch.close_local = body.closeLocal.trim();
   }
@@ -146,6 +154,27 @@ export async function patchScanner(
     (parseHhmmToMinutes(nextOpen) ?? 0) >= (parseHhmmToMinutes(nextClose) ?? 0)
   ) {
     throw new Error("openLocal must be before closeLocal");
+  }
+
+  if (body.includeWeekends !== undefined) {
+    patch.include_weekends = body.includeWeekends ? 1 : 0;
+  }
+
+  if (body.enabledQuoteAssets !== undefined) {
+    if (!isBinanceExchange(scanner.code)) {
+      throw new Error("enabledQuoteAssets is only supported for Binance");
+    }
+    if (!Array.isArray(body.enabledQuoteAssets)) {
+      throw new Error("enabledQuoteAssets must be an array of quote assets");
+    }
+    const normalized = body.enabledQuoteAssets
+      .filter((item): item is string => typeof item === "string")
+      .map((item) => item.trim().toUpperCase())
+      .filter(Boolean);
+    if (normalized.length === 0) {
+      throw new Error("Select at least one quote asset");
+    }
+    patch.enabled_quote_assets = serializeEnabledQuoteAssets(normalized);
   }
 
   if (body.enabled !== undefined) {
@@ -279,10 +308,14 @@ export async function processScannerJob(
 
   try {
     const market = createMarketDataService(env);
+    const quoteAssets = isBinanceExchange(scanner.code)
+      ? parseEnabledQuoteAssets(scanner.enabled_quote_assets)
+      : undefined;
     const page = await market.screen({
       exchange: scanner.code,
       offset: message.offset,
       limit: run.page_size,
+      quoteAssets,
     });
 
     let detailed = page;
@@ -401,6 +434,7 @@ export async function processScannerJob(
 
 function serializeScanner(scanner: Awaited<ReturnType<typeof getScanner>>) {
   if (!scanner) return null;
+  const binance = isBinanceExchange(scanner.code);
   return {
     id: scanner.id,
     code: scanner.code,
@@ -412,6 +446,10 @@ function serializeScanner(scanner: Awaited<ReturnType<typeof getScanner>>) {
     timezone: scanner.timezone,
     openLocal: scanner.open_local,
     closeLocal: scanner.close_local,
+    includeWeekends: Boolean(scanner.include_weekends),
+    enabledQuoteAssets: binance
+      ? parseEnabledQuoteAssets(scanner.enabled_quote_assets)
+      : null,
     sessionOpen: isExchangeSessionOpen(sessionFromRow(scanner)),
     lastRunAt: scanner.last_run_at,
     nextRunAt: scanner.next_run_at,

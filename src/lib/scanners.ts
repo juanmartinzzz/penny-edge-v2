@@ -53,6 +53,9 @@ export type Scanner = {
   timezone: string;
   openLocal: string;
   closeLocal: string;
+  includeWeekends: boolean;
+  /** Binance only; null for equity scanners. */
+  enabledQuoteAssets: string[] | null;
   /** Server-evaluated: exchange is in regular session right now. */
   sessionOpen: boolean;
   lastRunAt: string | null;
@@ -85,6 +88,8 @@ export function updateScanner(
     timezone?: string;
     openLocal?: string;
     closeLocal?: string;
+    includeWeekends?: boolean;
+    enabledQuoteAssets?: string[];
   },
 ) {
   return apiFetch<{ scanner: Scanner }>(`/scanners/${id}`, {

@@ -257,6 +257,8 @@ app.patch("/scanners/:id", async (c) => {
       timezone?: string;
       openLocal?: string;
       closeLocal?: string;
+      includeWeekends?: boolean;
+      enabledQuoteAssets?: string[];
     }>();
 
     const scanner = await patchScanner(c.env, c.req.param("id"), body);

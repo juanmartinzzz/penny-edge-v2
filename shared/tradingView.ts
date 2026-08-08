@@ -28,6 +28,9 @@ function tradingViewExchange(exchange: string | null): string {
       return "AMEX";
     case "PCX":
       return "NASDAQ";
+    case "BINANCE":
+    case "BIN":
+      return "BINANCE";
     default:
       return exchange.toUpperCase();
   }

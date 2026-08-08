@@ -19,8 +19,15 @@ export interface ExchangeScannerRow {
   timezone: string;
   /** Local open HH:MM (24h). */
   open_local: string;
-  /** Local close HH:MM (24h), exclusive. */
+  /** Local close HH:MM (24h), exclusive. "24:00" = end of day. */
   close_local: string;
+  /** 1 = Sat/Sun eligible for cron/TAS/SWATCH gates. */
+  include_weekends: number;
+  /**
+   * JSON array of Binance quote assets to screen (e.g. `["USDT"]`).
+   * NULL for equity scanners.
+   */
+  enabled_quote_assets: string | null;
   last_run_at: string | null;
   next_run_at: string | null;
   last_run_status: string | null;
@@ -90,6 +97,9 @@ export interface ScannerJobMessage {
 }
 
 export function approxDailyValue(quote: Quote): number | null {
+  if (quote.dailyQuoteNotional != null) {
+    return quote.dailyQuoteNotional;
+  }
   const vol3m = quote.averageVolume3m;
   const fiftyDay = quote.fiftyDayAverage;
   if (vol3m == null || fiftyDay == null) return null;

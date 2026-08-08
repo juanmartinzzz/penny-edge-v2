@@ -27,6 +27,12 @@ import {
   loadExchangeOpenHours,
   saveExchangeOpenHours,
 } from "../lib/exchangeHours";
+import {
+  BINANCE_QUOTE_ASSET_OPTIONS,
+  DEFAULT_BINANCE_QUOTE_ASSETS,
+  isBinanceExchange,
+} from "../lib/binance";
+import { PillSelect } from "../components/interaction/PillSelect";
 import { PRODUCT_NAMES } from "../lib/productNames";
 import { formatDateTime } from "../lib/dates";
 import "./ScannersPage.css";
@@ -38,7 +44,19 @@ type ScannerDraft = {
   timezone: string;
   openLocal: string;
   closeLocal: string;
+  includeWeekends: boolean;
+  enabledQuoteAssets: string[];
 };
+
+const WEEKEND_OPTIONS = [
+  { value: "weekdays", label: "Weekdays only" },
+  { value: "weekends", label: "Include weekends" },
+];
+
+const QUOTE_ASSET_OPTIONS = BINANCE_QUOTE_ASSET_OPTIONS.map((asset) => ({
+  value: asset,
+  label: asset,
+}));
 
 function draftFromScanner(scanner: Scanner): ScannerDraft {
   const fallback = loadExchangeOpenHours(scanner.code);
@@ -53,6 +71,12 @@ function draftFromScanner(scanner: Scanner): ScannerDraft {
     timezone: scanner.timezone || fallback.timezone,
     openLocal: scanner.openLocal || fallback.openLocal,
     closeLocal: scanner.closeLocal || fallback.closeLocal,
+    includeWeekends:
+      scanner.includeWeekends ?? fallback.includeWeekends ?? false,
+    enabledQuoteAssets:
+      scanner.enabledQuoteAssets?.length
+        ? [...scanner.enabledQuoteAssets]
+        : [...DEFAULT_BINANCE_QUOTE_ASSETS],
   };
 }
 
@@ -116,9 +140,24 @@ function parseOptionalNumber(raw: string): number | null {
   return value;
 }
 
+function sameStringList(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const left = [...a].sort();
+  const right = [...b].sort();
+  return left.every((value, index) => value === right[index]);
+}
+
 function draftMatchesScanner(scanner: Scanner, draft: ScannerDraft): boolean {
   try {
     const fallback = loadExchangeOpenHours(scanner.code);
+    const quoteMatch = isBinanceExchange(scanner.code)
+      ? sameStringList(
+          draft.enabledQuoteAssets,
+          scanner.enabledQuoteAssets?.length
+            ? scanner.enabledQuoteAssets
+            : [...DEFAULT_BINANCE_QUOTE_ASSETS],
+        )
+      : true;
     return (
       Number(draft.intervalHours) === scanner.intervalHours &&
       parseOptionalNumber(draft.minAvgVolume10d) === scanner.minAvgVolume10d &&
@@ -126,7 +165,10 @@ function draftMatchesScanner(scanner: Scanner, draft: ScannerDraft): boolean {
         scanner.minApproxDailyValue &&
       draft.timezone.trim() === (scanner.timezone || fallback.timezone) &&
       draft.openLocal.trim() === (scanner.openLocal || fallback.openLocal) &&
-      draft.closeLocal.trim() === (scanner.closeLocal || fallback.closeLocal)
+      draft.closeLocal.trim() === (scanner.closeLocal || fallback.closeLocal) &&
+      draft.includeWeekends ===
+        (scanner.includeWeekends ?? fallback.includeWeekends ?? false) &&
+      quoteMatch
     );
   } catch {
     return false;
@@ -265,12 +307,16 @@ export function ScannersPage() {
         timezone: draft.timezone.trim(),
         openLocal: draft.openLocal.trim(),
         closeLocal: draft.closeLocal.trim(),
+        includeWeekends: draft.includeWeekends,
       };
       const { scanner: updated } = await updateScanner(scanner.id, {
         intervalHours: Number(draft.intervalHours),
         minAvgVolume10d: parseOptionalNumber(draft.minAvgVolume10d),
         minApproxDailyValue: parseOptionalNumber(draft.minApproxDailyValue),
         ...openHours,
+        ...(isBinanceExchange(scanner.code)
+          ? { enabledQuoteAssets: draft.enabledQuoteAssets }
+          : {}),
       });
       saveExchangeOpenHours(scanner.code, openHours);
       setScanners((current) =>
@@ -347,8 +393,9 @@ export function ScannersPage() {
     const runProgress = opts.running
       ? ` · ${scanner.activeRun?.status} ${scanner.activeRun?.scanned ?? 0}/${scanner.activeRun?.matched ?? 0}`
       : "";
+    const binance = isBinanceExchange(scanner.code);
 
-    return [
+    const sections: SectionsCardSection[] = [
       {
         id: "status",
         title: "Status",
@@ -370,14 +417,44 @@ export function ScannersPage() {
           </div>,
         ],
       },
+    ];
+
+    if (binance) {
+      sections.push({
+        id: "quotes",
+        title: "Quote markets",
+        description:
+          "Only pairs priced in these quote assets are screened. TAS follows gated symbols.",
+        columns: [
+          <PillSelect
+            key="quoteAssets"
+            label="Enabled quote assets"
+            multiple
+            limit={4}
+            options={QUOTE_ASSET_OPTIONS}
+            value={draft.enabledQuoteAssets}
+            onChange={(enabledQuoteAssets) => {
+              if (enabledQuoteAssets.length === 0) return;
+              patchDraft(scanner.id, draft, { enabledQuoteAssets });
+            }}
+          />,
+        ],
+      });
+    }
+
+    sections.push(
       {
         id: "filters",
         title: "Volume filters",
-        description: "Gate thresholds and how often this exchange re-screens.",
+        description: binance
+          ? "Gate thresholds in quote notional (e.g. USDT) and how often this exchange re-screens."
+          : "Gate thresholds and how often this exchange re-screens.",
         columns: [
           <NumericInput
             key="minAvgVolume10d"
-            label="Min 10d avg volume"
+            label={
+              binance ? "Min 10d avg quote volume" : "Min 10d avg volume"
+            }
             value={draft.minAvgVolume10d}
             onChange={(event) =>
               patchDraft(scanner.id, draft, {
@@ -387,7 +464,11 @@ export function ScannersPage() {
           />,
           <NumericInput
             key="minApproxDailyValue"
-            label="Min approx daily value"
+            label={
+              binance
+                ? "Min approx daily quote notional"
+                : "Min approx daily value"
+            }
             value={draft.minApproxDailyValue}
             onChange={(event) =>
               patchDraft(scanner.id, draft, {
@@ -413,7 +494,7 @@ export function ScannersPage() {
         id: "hours",
         title: "Open hours",
         description:
-          "Cron skips Yahoo outside Mon–Fri open→close. Manual Run still works.",
+          "Cron skips market calls outside open→close. Use 00:00–24:00 for all day; include weekends when needed. Manual Run still works.",
         columns: [
           <label
             key="timezone"
@@ -438,10 +519,12 @@ export function ScannersPage() {
             className="numeric-input"
             htmlFor={`open-${scanner.id}`}
           >
-            <span className="numeric-input-label">Open (local)</span>
+            <span className="numeric-input-label">Open (local HH:MM)</span>
             <input
               id={`open-${scanner.id}`}
-              type="time"
+              type="text"
+              inputMode="numeric"
+              placeholder="09:30"
               value={draft.openLocal}
               onChange={(event) =>
                 patchDraft(scanner.id, draft, {
@@ -455,10 +538,14 @@ export function ScannersPage() {
             className="numeric-input"
             htmlFor={`close-${scanner.id}`}
           >
-            <span className="numeric-input-label">Close (local)</span>
+            <span className="numeric-input-label">
+              Close (local HH:MM or 24:00)
+            </span>
             <input
               id={`close-${scanner.id}`}
-              type="time"
+              type="text"
+              inputMode="numeric"
+              placeholder="16:00"
               value={draft.closeLocal}
               onChange={(event) =>
                 patchDraft(scanner.id, draft, {
@@ -467,6 +554,17 @@ export function ScannersPage() {
               }
             />
           </label>,
+          <PillSelect
+            key="weekends"
+            label="Weekend trading"
+            options={WEEKEND_OPTIONS}
+            value={draft.includeWeekends ? "weekends" : "weekdays"}
+            onChange={(value) =>
+              patchDraft(scanner.id, draft, {
+                includeWeekends: value === "weekends",
+              })
+            }
+          />,
         ],
       },
       {
@@ -531,7 +629,9 @@ export function ScannersPage() {
           </div>,
         ],
       },
-    ];
+    );
+
+    return sections;
   }
 
   return (
@@ -548,8 +648,8 @@ export function ScannersPage() {
         <p>
           Scheduled per-exchange volume gate. Symbols that clear the filters are
           kept warm as each batch finishes. Cron waits for each exchange’s
-          market hours; TAS and SWATCH skip Yahoo calls when the market is
-          closed too.
+          configured hours (weekends optional; 00:00–24:00 for all day). TAS and
+          SWATCH skip market calls when the session is closed too.
         </p>
       </header>
 
@@ -569,6 +669,7 @@ export function ScannersPage() {
             timezone: draft.timezone,
             openLocal: draft.openLocal,
             closeLocal: draft.closeLocal,
+            includeWeekends: draft.includeWeekends,
           });
 
           return (
