@@ -224,9 +224,17 @@ export async function listWarmSymbols(
   db: D1Database,
   scannerId: string,
 ): Promise<WarmSymbolRow[]> {
+  // Explicit columns — omit analysis_json / temperature blobs. EVG only needs
+  // quote fields; SELECT * blows up once hundreds of symbols have TAS payloads.
   const result = await db
     .prepare(
-      `SELECT * FROM warm_symbols
+      `SELECT
+         id, scanner_id, symbol, exchange, name, price, change_percent,
+         volume, avg_volume_10d, avg_volume_3m, fifty_day_average,
+         approx_daily_value, currency, is_warm, last_seen_run_id, last_seen_at,
+         analyzed_at, analysis_run_id, temperature, temperature_at,
+         temperature_run_id, cobuta_alerted, created_at, updated_at
+       FROM warm_symbols
        WHERE scanner_id = ? AND is_warm = 1
        ORDER BY (approx_daily_value IS NULL), approx_daily_value DESC, symbol ASC`,
     )

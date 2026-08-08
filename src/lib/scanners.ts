@@ -39,7 +39,6 @@ export type WarmSymbol = {
   lastSeenAt: string;
   analyzedAt?: string | null;
   analysisRunId?: string | null;
-  analysis?: unknown;
 };
 
 export type Scanner = {

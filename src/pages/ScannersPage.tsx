@@ -181,11 +181,24 @@ export function ScannersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [loadingSymbolIds, setLoadingSymbolIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [drafts, setDrafts] = useState<Record<string, ScannerDraft>>({});
 
   async function refreshList() {
     const data = await listScanners();
-    setScanners(data.scanners);
+    setScanners((current) => {
+      const symbolsById = new Map(
+        current
+          .filter((scanner) => scanner.symbols)
+          .map((scanner) => [scanner.id, scanner.symbols]),
+      );
+      return data.scanners.map((scanner) => {
+        const symbols = symbolsById.get(scanner.id);
+        return symbols ? { ...scanner, symbols } : scanner;
+      });
+    });
     setDrafts((current) => {
       const next = { ...current };
       for (const scanner of data.scanners) {
@@ -195,15 +208,29 @@ export function ScannersPage() {
       }
       return next;
     });
+    return data.scanners;
   }
 
   async function refreshDetail(id: string) {
-    const data = await getScanner(id);
-    setScanners((current) =>
-      current.map((scanner) =>
-        scanner.id === id ? { ...scanner, ...data.scanner } : scanner,
-      ),
-    );
+    setLoadingSymbolIds((current) => {
+      const next = new Set(current);
+      next.add(id);
+      return next;
+    });
+    try {
+      const data = await getScanner(id);
+      setScanners((current) =>
+        current.map((scanner) =>
+          scanner.id === id ? { ...scanner, ...data.scanner } : scanner,
+        ),
+      );
+    } finally {
+      setLoadingSymbolIds((current) => {
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
+    }
   }
 
   useEffect(() => {
@@ -212,7 +239,24 @@ export function ScannersPage() {
     (async () => {
       try {
         setLoading(true);
-        await refreshList();
+        const list = await refreshList();
+        if (cancelled) return;
+        await Promise.all(
+          list
+            .filter((scanner) => scanner.warmCount > 0)
+            .map((scanner) =>
+              refreshDetail(scanner.id).catch((err) => {
+                if (!cancelled) {
+                  reportUiError(
+                    setError,
+                    err,
+                    "Failed to load symbols",
+                    "EVG",
+                  );
+                }
+              }),
+            ),
+        );
       } catch (err) {
         if (!cancelled) {
           reportUiError(setError, err, "Failed to load EVG", "EVG");
@@ -396,6 +440,7 @@ export function ScannersPage() {
       running: boolean;
       settingsDirty: boolean;
       sessionOpen: boolean;
+      loadingSymbols: boolean;
     },
   ): SectionsCardSection[] {
     const scheduleStatus = scanner.enabled
@@ -593,8 +638,16 @@ export function ScannersPage() {
             initialSort={[{ columnId: "volume", direction: "desc" }]}
             empty={
               <p className="scanner-empty">
-                No gated symbols yet. Save filters and hit Run{" "}
-                {PRODUCT_NAMES.EVG}.
+                {opts.loadingSymbols
+                  ? "Loading gated symbols…"
+                  : scanner.warmCount > 0
+                    ? "Couldn’t load gated symbols. Expand the card again or refresh the page."
+                    : (
+                      <>
+                        No gated symbols yet. Save filters and hit Run{" "}
+                        {PRODUCT_NAMES.EVG}.
+                      </>
+                    )}
               </p>
             }
           />,
@@ -683,13 +736,15 @@ export function ScannersPage() {
             includeWeekends: draft.includeWeekends,
           });
 
+          const loadingSymbols = loadingSymbolIds.has(scanner.id);
+
           return (
             <SectionsCard
               key={scanner.id}
               id={`evg.${scanner.code}`}
               collapsible
               onExpand={() => {
-                if (scanner.symbols) return;
+                if (scanner.symbols || loadingSymbols) return;
                 void refreshDetail(scanner.id).catch((err) => {
                   reportUiError(
                     setError,
@@ -715,6 +770,7 @@ export function ScannersPage() {
                 running,
                 settingsDirty,
                 sessionOpen,
+                loadingSymbols,
               })}
             />
           );

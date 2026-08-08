@@ -30,7 +30,6 @@ import {
   updateScanner,
   upsertWarmSymbols,
 } from "./repo";
-import { parseAnalysisJson } from "../analysis/types";
 import {
   addHours,
   approxDailyValue,
@@ -505,7 +504,6 @@ function serializeWarmSymbol(
     lastSeenAt: row.last_seen_at,
     analyzedAt: row.analyzed_at ?? null,
     analysisRunId: row.analysis_run_id ?? null,
-    analysis: parseAnalysisJson(row.analysis_json ?? null),
   };
 }
 
