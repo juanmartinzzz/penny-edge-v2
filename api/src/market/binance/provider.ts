@@ -13,105 +13,31 @@ import {
   DEFAULT_BINANCE_QUOTE_ASSETS,
 } from "./constants";
 import {
-  BINANCE_REST_BASES,
-  klineLimitFor,
-  mapBinanceInterval,
-  mapBinanceQuote,
-  mapKlinesToBars,
-  type BinanceExchangeSymbol,
-  type BinanceKline,
-  type BinanceTicker24hr,
+  COINGECKO_MAX_PAGES,
+  COINGECKO_TICKERS_PAGE_SIZE,
+  fetchCoinGeckoBinanceTickerPage,
+} from "./coingecko";
+import {
+  mapCoinGeckoTickerToQuote,
+  splitBinanceSymbol,
 } from "./map";
 
-const KLINE_CONCURRENCY = 8;
-
-const BINANCE_HEADERS: HeadersInit = {
-  Accept: "application/json",
-  "User-Agent":
-    "Mozilla/5.0 (compatible; PennyEdge/1.0; +https://github.com/juanmartinzzz/penny-edge-v2)",
-};
-
-async function fetchJson<T>(
-  path: string,
-  params?: Record<string, string>,
-): Promise<T> {
-  let lastError: Error | null = null;
-
-  for (const base of BINANCE_REST_BASES) {
-    const url = new URL(path, base);
-    if (params) {
-      for (const [key, value] of Object.entries(params)) {
-        url.searchParams.set(key, value);
-      }
-    }
-
-    try {
-      const response = await fetch(url.toString(), {
-        headers: BINANCE_HEADERS,
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        lastError = new Error(
-          `Binance ${path} failed (${response.status}) via ${base}: ${text.slice(0, 200)}`,
-        );
-        // Try next host on geo/WAF style blocks.
-        if (response.status === 403 || response.status === 451) {
-          console.error(lastError.message);
-          continue;
-        }
-        throw lastError;
-      }
-
-      return (await response.json()) as T;
-    } catch (error) {
-      if (error instanceof Error && error !== lastError) {
-        lastError = error;
-        console.error(
-          `Binance ${path} network error via ${base}:`,
-          error.message,
-        );
-        continue;
-      }
-      throw error;
-    }
-  }
-
-  throw lastError ?? new Error(`Binance ${path} failed on all hosts`);
-}
-
-async function mapPool<T, R>(
-  items: T[],
-  concurrency: number,
-  mapper: (item: T) => Promise<R>,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let next = 0;
-
-  async function worker() {
-    while (next < items.length) {
-      const index = next;
-      next += 1;
-      results[index] = await mapper(items[index]!);
-    }
-  }
-
-  const workers = Array.from(
-    { length: Math.min(concurrency, Math.max(items.length, 1)) },
-    () => worker(),
-  );
-  await Promise.all(workers);
-  return results;
-}
-
+/**
+ * Binance venue market data via CoinGecko exchange tickers.
+ * Direct Binance REST is blocked from Cloudflare Worker egress (403/451).
+ * Phase 1: screen + quotes for EVG. Charts deferred (getChart throws).
+ */
 export class BinanceMarketDataProvider implements MarketDataProvider {
   readonly id = "binance" as const;
 
+  constructor(private readonly coinGeckoDemoApiKey: string) {}
+
   async getAuthStatus(): Promise<ProviderAuthStatus> {
+    const present = Boolean(this.coinGeckoDemoApiKey.trim());
     return {
       provider: this.id,
-      present: true,
-      fresh: true,
+      present,
+      fresh: present,
       obtainedAt: null,
       staleAfterMinutes: null,
     };
@@ -123,73 +49,71 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
 
   async getQuotes(refs: InstrumentRef[]): Promise<Quote[]> {
     if (refs.length === 0) return [];
+    this.requireKey();
 
-    const symbols = refs.map((ref) => ref.symbol.trim().toUpperCase());
-    const unique = [...new Set(symbols)];
-
-    const tickers = await this.fetchTickers(unique);
-    const bySymbol = new Map(tickers.map((ticker) => [ticker.symbol, ticker]));
-
-    const quotes = await mapPool(refs, KLINE_CONCURRENCY, async (ref) => {
+    const wanted = new Map<string, InstrumentRef>();
+    for (const ref of refs) {
       const symbol = ref.symbol.trim().toUpperCase();
-      const ticker = bySymbol.get(symbol);
-      if (!ticker) {
-        return {
-          symbol,
-          exchange: BINANCE_EXCHANGE_CODE,
-          price: null,
-          change: null,
-          changePercent: null,
-          volume: null,
-          asOf: new Date().toISOString(),
-        } satisfies Quote;
+      if (symbol) wanted.set(symbol, ref);
+    }
+
+    const found = new Map<string, Quote>();
+    for (let page = 1; page <= COINGECKO_MAX_PAGES; page++) {
+      if (found.size >= wanted.size) break;
+
+      const tickers = await fetchCoinGeckoBinanceTickerPage(
+        this.coinGeckoDemoApiKey,
+        page,
+      );
+      if (tickers.length === 0) break;
+
+      for (const ticker of tickers) {
+        const quote = mapCoinGeckoTickerToQuote(ticker);
+        if (!quote) continue;
+        if (!wanted.has(quote.symbol)) continue;
+        found.set(quote.symbol, quote);
       }
 
-      let dailyKlines: BinanceKline[] | undefined;
-      try {
-        dailyKlines = await fetchJson<BinanceKline[]>("/api/v3/klines", {
-          symbol,
-          interval: "1d",
-          limit: "90",
-        });
-      } catch {
-        dailyKlines = undefined;
-      }
+      if (tickers.length < COINGECKO_TICKERS_PAGE_SIZE) break;
+    }
 
-      return mapBinanceQuote({ ticker, dailyKlines });
+    const asOf = new Date().toISOString();
+    return refs.map((ref) => {
+      const symbol = ref.symbol.trim().toUpperCase();
+      const hit = found.get(symbol);
+      if (hit) return hit;
+
+      const parts = splitBinanceSymbol(symbol);
+      return {
+        symbol,
+        exchange: BINANCE_EXCHANGE_CODE,
+        name: parts ? `${parts.base}/${parts.quote}` : symbol,
+        price: null,
+        change: null,
+        changePercent: null,
+        volume: null,
+        currency: parts?.quote,
+        asOf,
+      } satisfies Quote;
     });
-
-    return quotes;
   }
 
   async getChart(
     ref: InstrumentRef,
-    opts: { interval: Interval; range: Range },
+    _opts: { interval: Interval; range: Range },
   ): Promise<ChartResult> {
-    const symbol = ref.symbol.trim().toUpperCase();
-    const interval = mapBinanceInterval(opts.interval);
-    const limit = String(klineLimitFor(opts.interval, opts.range));
-
-    const klines = await fetchJson<BinanceKline[]>("/api/v3/klines", {
-      symbol,
-      interval,
-      limit,
-    });
-
-    return {
-      symbol,
-      interval: opts.interval,
-      range: opts.range,
-      currency: undefined,
-      bars: mapKlinesToBars(klines),
-    };
+    throw new Error(
+      `Binance charts are not available yet for ${ref.symbol.trim().toUpperCase()} (Phase 1 uses CoinGecko tickers for EVG only; klines deferred)`,
+    );
   }
 
   /**
-   * Paginate TRADING pairs for enabled quote assets, sorted by 24h quote volume.
-   * `query.quoteAssets` defaults to USDT when omitted.
+   * Paginate CoinGecko Binance tickers (volume desc), filter by quote asset,
+   * return EVG offset/limit window as Quotes with dailyQuoteNotional.
    */
   async screen(query: ScreenerQuery): Promise<Quote[]> {
+    this.requireKey();
+
     const offset = query.offset ?? 0;
     const limit = Math.min(query.limit ?? 50, 200);
     const quoteAssets = (
@@ -198,67 +122,45 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
         : DEFAULT_BINANCE_QUOTE_ASSETS
     ).map((asset) => asset.toUpperCase());
     const quoteSet = new Set(quoteAssets);
+    if (quoteSet.size === 0 || limit <= 0) return [];
 
-    if (quoteSet.size === 0) return [];
+    const collected: Quote[] = [];
+    let skipped = 0;
 
-    const [info, tickers] = await Promise.all([
-      fetchJson<{ symbols: BinanceExchangeSymbol[] }>("/api/v3/exchangeInfo"),
-      fetchJson<BinanceTicker24hr[]>("/api/v3/ticker/24hr"),
-    ]);
+    for (let page = 1; page <= COINGECKO_MAX_PAGES; page++) {
+      const tickers = await fetchCoinGeckoBinanceTickerPage(
+        this.coinGeckoDemoApiKey,
+        page,
+      );
+      if (tickers.length === 0) break;
 
-    const metaBySymbol = new Map<string, BinanceExchangeSymbol>();
-    for (const item of info.symbols ?? []) {
-      if (item.status !== "TRADING") continue;
-      if (!quoteSet.has(item.quoteAsset.toUpperCase())) continue;
-      metaBySymbol.set(item.symbol, item);
+      for (const ticker of tickers) {
+        const target = ticker.target?.trim().toUpperCase();
+        if (!target || !quoteSet.has(target)) continue;
+
+        const quote = mapCoinGeckoTickerToQuote(ticker);
+        if (!quote) continue;
+
+        if (skipped < offset) {
+          skipped += 1;
+          continue;
+        }
+
+        collected.push(quote);
+        if (collected.length >= limit) return collected;
+      }
+
+      if (tickers.length < COINGECKO_TICKERS_PAGE_SIZE) break;
     }
 
-    const ranked: Array<{
-      ticker: BinanceTicker24hr;
-      meta: BinanceExchangeSymbol;
-      quoteVolume: number;
-    }> = [];
-
-    for (const ticker of tickers) {
-      const meta = metaBySymbol.get(ticker.symbol);
-      if (!meta) continue;
-      const quoteVolume = Number(ticker.quoteVolume);
-      ranked.push({
-        ticker,
-        meta,
-        quoteVolume: Number.isFinite(quoteVolume) ? quoteVolume : 0,
-      });
-    }
-
-    ranked.sort((a, b) => b.quoteVolume - a.quoteVolume);
-
-    return ranked.slice(offset, offset + limit).map(({ ticker, meta }) =>
-      mapBinanceQuote({
-        ticker,
-        baseAsset: meta.baseAsset,
-        quoteAsset: meta.quoteAsset,
-      }),
-    );
+    return collected;
   }
 
-  private async fetchTickers(symbols: string[]): Promise<BinanceTicker24hr[]> {
-    if (symbols.length === 0) return [];
-    if (symbols.length === 1) {
-      return [
-        await fetchJson<BinanceTicker24hr>("/api/v3/ticker/24hr", {
-          symbol: symbols[0]!,
-        }),
-      ];
+  private requireKey(): void {
+    if (!this.coinGeckoDemoApiKey.trim()) {
+      throw new Error(
+        "COINGECKO_DEMO_API_KEY is missing — required for Binance EVG via CoinGecko",
+      );
     }
-
-    if (symbols.length <= 100) {
-      return fetchJson<BinanceTicker24hr[]>("/api/v3/ticker/24hr", {
-        symbols: JSON.stringify(symbols),
-      });
-    }
-
-    const all = await fetchJson<BinanceTicker24hr[]>("/api/v3/ticker/24hr");
-    const wanted = new Set(symbols);
-    return all.filter((ticker) => wanted.has(ticker.symbol));
   }
 }

@@ -16,10 +16,12 @@ export interface MarketEnv {
   DB: D1Database;
   MARKET_DATA_PROVIDER?: string;
   YAHOO_STALE_AFTER_MINUTES?: string;
+  /** Demo key for CoinGecko Binance venue tickers (EVG). */
+  COINGECKO_DEMO_API_KEY?: string;
 }
 
 /**
- * Routes by instrument/exchange: Binance codes → global Binance public REST,
+ * Routes by instrument/exchange: Binance codes → CoinGecko Binance venue tickers,
  * everything else → Yahoo.
  */
 export class RoutingMarketDataProvider implements MarketDataProvider {
@@ -114,7 +116,9 @@ export function createMarketDataService(env: MarketEnv): MarketDataService {
   }
 
   const yahoo = new YahooMarketDataProvider(env.DB, staleAfterMinutes);
-  const binance = new BinanceMarketDataProvider();
+  const binance = new BinanceMarketDataProvider(
+    env.COINGECKO_DEMO_API_KEY?.trim() ?? "",
+  );
 
   return new MarketDataService(new RoutingMarketDataProvider(yahoo, binance));
 }

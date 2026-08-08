@@ -169,7 +169,6 @@ app.post("/market/auth/refresh", async (c) => {
   const status = await market.refreshAuth();
   return c.json({ provider: market.providerId, ...status });
 });
-
 app.get("/market/quotes", async (c) => {
   const symbols = c.req.query("symbols");
   if (!symbols) {

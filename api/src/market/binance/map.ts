@@ -1,188 +1,80 @@
-import type { Bar, Interval, Quote, Range } from "../types";
-import { BINANCE_EXCHANGE_CODE } from "./constants";
+import type { Quote } from "../types";
+import {
+  BINANCE_EXCHANGE_CODE,
+  BINANCE_QUOTE_ASSET_OPTIONS,
+} from "./constants";
+import type { CoinGeckoBinanceTicker } from "./coingecko";
 
-/**
- * Global Binance public REST hosts.
- * Note: Cloudflare Worker egress is often geo/WAF blocked (451/403).
- * See docs/binance-market-data.md.
- */
-export const BINANCE_REST_BASES = [
-  "https://data-api.binance.vision",
-  "https://api.binance.com",
-] as const;
+/** Longest-first so FDUSD wins over USD-like suffixes. */
+const QUOTE_SUFFIXES = [...BINANCE_QUOTE_ASSET_OPTIONS].sort(
+  (a, b) => b.length - a.length,
+);
 
-/** @deprecated use BINANCE_REST_BASES */
-export const BINANCE_REST_BASE = BINANCE_REST_BASES[0];
+/** Build Binance-style symbol from CoinGecko base/target (e.g. BTC + USDT → BTCUSDT). */
+export function pairSymbol(base: string, target: string): string {
+  return `${base.trim().toUpperCase()}${target.trim().toUpperCase()}`;
+}
 
-export type BinanceExchangeSymbol = {
-  symbol: string;
-  status: string;
-  baseAsset: string;
-  quoteAsset: string;
-};
-
-export type BinanceTicker24hr = {
-  symbol: string;
-  lastPrice: string;
-  priceChange: string;
-  priceChangePercent: string;
-  volume: string;
-  quoteVolume: string;
-};
-
-/** Kline row: openTime, o, h, l, c, volume, closeTime, quoteVolume, ... */
-export type BinanceKline = [
-  number,
-  string,
-  string,
-  string,
-  string,
-  string,
-  number,
-  string,
-  ...unknown[],
-];
-
-export function mapBinanceInterval(interval: Interval): string {
-  switch (interval) {
-    case "1m":
-      return "1m";
-    case "5m":
-      return "5m";
-    case "15m":
-      return "15m";
-    case "1h":
-      return "1h";
-    case "1d":
-      return "1d";
-    case "1wk":
-      return "1w";
-    case "1mo":
-      return "1M";
-    default:
-      return "1d";
+/** Split BTCUSDT → { base: BTC, quote: USDT } using known quote pills. */
+export function splitBinanceSymbol(
+  symbol: string,
+): { base: string; quote: string } | null {
+  const normalized = symbol.trim().toUpperCase();
+  for (const quote of QUOTE_SUFFIXES) {
+    if (normalized.length <= quote.length) continue;
+    if (!normalized.endsWith(quote)) continue;
+    const base = normalized.slice(0, -quote.length);
+    if (!base) continue;
+    return { base, quote };
   }
+  return null;
 }
 
-/** Approximate candle count for Yahoo-style range + interval. */
-export function klineLimitFor(interval: Interval, range: Range): number {
-  const rangeDays: Record<Range, number> = {
-    "1d": 1,
-    "5d": 5,
-    "1mo": 31,
-    "3mo": 93,
-    "6mo": 186,
-    "1y": 372,
-    "2y": 744,
-    "5y": 1860,
-    max: 1000,
-  };
-  const days = rangeDays[range] ?? 31;
-  const perDay: Record<Interval, number> = {
-    "1m": 24 * 60,
-    "5m": 24 * 12,
-    "15m": 24 * 4,
-    "1h": 24,
-    "1d": 1,
-    "1wk": 1 / 7,
-    "1mo": 1 / 30,
-  };
-  const rate = perDay[interval] ?? 1;
-  return Math.min(1000, Math.max(1, Math.ceil(days * rate) + 2));
-}
+export function mapCoinGeckoTickerToQuote(
+  ticker: CoinGeckoBinanceTicker,
+): Quote | null {
+  const base = ticker.base?.trim().toUpperCase();
+  const target = ticker.target?.trim().toUpperCase();
+  if (!base || !target) return null;
+  if (ticker.is_stale || ticker.is_anomaly) return null;
 
-export function mapKlinesToBars(klines: BinanceKline[]): Bar[] {
-  const bars: Bar[] = [];
-  for (const row of klines) {
-    const open = Number(row[1]);
-    const high = Number(row[2]);
-    const low = Number(row[3]);
-    const close = Number(row[4]);
-    const volume = Number(row[5]);
-    const time = Number(row[0]);
-    if (
-      !Number.isFinite(open) ||
-      !Number.isFinite(high) ||
-      !Number.isFinite(low) ||
-      !Number.isFinite(close) ||
-      !Number.isFinite(time)
-    ) {
-      continue;
-    }
-    bars.push({
-      time: Math.floor(time / 1000),
-      open,
-      high,
-      low,
-      close,
-      volume: Number.isFinite(volume) ? volume : undefined,
-    });
+  const symbol = pairSymbol(base, target);
+  const price = typeof ticker.last === "number" ? ticker.last : null;
+  const baseVolume = typeof ticker.volume === "number" ? ticker.volume : null;
+  const convertedUsd =
+    typeof ticker.converted_volume?.usd === "number"
+      ? ticker.converted_volume.usd
+      : null;
+
+  // Prefer USD converted volume for EVG dollar gates; fall back to base*last.
+  let dailyQuoteNotional = convertedUsd;
+  if (
+    dailyQuoteNotional == null &&
+    baseVolume != null &&
+    price != null &&
+    Number.isFinite(baseVolume * price)
+  ) {
+    dailyQuoteNotional = baseVolume * price;
   }
-  return bars;
-}
 
-export function mean(values: number[]): number | null {
-  if (values.length === 0) return null;
-  let sum = 0;
-  for (const value of values) sum += value;
-  return sum / values.length;
-}
-
-/**
- * Build a Quote from 24h ticker + optional daily klines for volume gates.
- * Volume filters use quote notional (quote asset units).
- */
-export function mapBinanceQuote(opts: {
-  ticker: BinanceTicker24hr;
-  baseAsset?: string;
-  quoteAsset?: string;
-  dailyKlines?: BinanceKline[];
-}): Quote {
-  const { ticker, baseAsset, quoteAsset, dailyKlines } = opts;
-  const price = Number(ticker.lastPrice);
-  const change = Number(ticker.priceChange);
-  const changePercent = Number(ticker.priceChangePercent);
-  const volume = Number(ticker.volume);
-  const quoteVolume24h = Number(ticker.quoteVolume);
-
-  let averageVolume10d: number | null = null;
-  let averageVolume3m: number | null = null;
-  let fiftyDayAverage: number | null = null;
-  let dailyQuoteNotional: number | null = null;
-
-  if (dailyKlines && dailyKlines.length > 0) {
-    const quoteVols = dailyKlines
-      .map((row) => Number(row[7]))
-      .filter((value) => Number.isFinite(value));
-    const closes = dailyKlines
-      .map((row) => Number(row[4]))
-      .filter((value) => Number.isFinite(value));
-
-    averageVolume10d = mean(quoteVols.slice(-10));
-    averageVolume3m = mean(quoteVols.slice(-90));
-    fiftyDayAverage = mean(closes.slice(-50));
-    dailyQuoteNotional = averageVolume3m;
-  } else if (Number.isFinite(quoteVolume24h)) {
-    // Fallback when klines are unavailable: 24h quote volume as notional proxy.
-    averageVolume10d = quoteVolume24h;
-    averageVolume3m = quoteVolume24h;
-    dailyQuoteNotional = quoteVolume24h;
-    fiftyDayAverage = Number.isFinite(price) ? price : null;
+  if (dailyQuoteNotional == null || !Number.isFinite(dailyQuoteNotional)) {
+    return null;
   }
 
   return {
-    symbol: ticker.symbol,
+    symbol,
     exchange: BINANCE_EXCHANGE_CODE,
-    name: baseAsset && quoteAsset ? `${baseAsset}/${quoteAsset}` : ticker.symbol,
-    price: Number.isFinite(price) ? price : null,
-    change: Number.isFinite(change) ? change : null,
-    changePercent: Number.isFinite(changePercent) ? changePercent : null,
-    volume: Number.isFinite(volume) ? volume : null,
-    averageVolume10d,
-    averageVolume3m,
-    fiftyDayAverage,
+    name: `${base}/${target}`,
+    price: price != null && Number.isFinite(price) ? price : null,
+    change: null,
+    changePercent: null,
+    volume: baseVolume != null && Number.isFinite(baseVolume) ? baseVolume : null,
+    // Phase 1: 24h venue notional as stand-in for 10d / 3m averages (no klines).
+    averageVolume10d: dailyQuoteNotional,
+    averageVolume3m: dailyQuoteNotional,
+    fiftyDayAverage: price != null && Number.isFinite(price) ? price : null,
     dailyQuoteNotional,
-    currency: quoteAsset,
-    asOf: new Date().toISOString(),
+    currency: target,
+    asOf: ticker.timestamp ?? ticker.last_traded_at ?? new Date().toISOString(),
   };
 }

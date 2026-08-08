@@ -319,7 +319,13 @@ export async function processScannerJob(
     });
 
     let detailed = page;
-    if (page.length > 0) {
+    // CoinGecko Binance screen already fills dailyQuoteNotional — skip a second
+    // round-trip that would re-walk ticker pages.
+    const needsDetail = page.some(
+      (quote) =>
+        quote.dailyQuoteNotional == null && quote.averageVolume10d == null,
+    );
+    if (page.length > 0 && needsDetail) {
       detailed = await market.getQuotes(
         page.map((quote) => ({
           symbol: quote.symbol,
