@@ -133,6 +133,33 @@ export async function listWarmSymbolsWithAnalysisPage(
   return result.results ?? [];
 }
 
+/**
+ * Warm symbols whose TAS snapshot is newer than the last HIS score
+ * (or never scored). No OFFSET — callers drain with repeated LIMIT batches
+ * because scoring updates temperature_at and would invalidate OFFSET pages.
+ */
+export async function listWarmSymbolsNeedingTemperaturePage(
+  db: D1Database,
+  limit: number,
+): Promise<WarmSymbolRow[]> {
+  const result = await db
+    .prepare(
+      `SELECT * FROM warm_symbols
+       WHERE is_warm = 1
+         AND analysis_json IS NOT NULL
+         AND analyzed_at IS NOT NULL
+         AND (
+           temperature_at IS NULL
+           OR analyzed_at > temperature_at
+         )
+       ORDER BY exchange ASC, symbol ASC
+       LIMIT ?`,
+    )
+    .bind(limit)
+    .all<WarmSymbolRow>();
+  return result.results ?? [];
+}
+
 export async function listAllWarmSymbolsWithTemperature(
   db: D1Database,
 ): Promise<WarmSymbolRow[]> {

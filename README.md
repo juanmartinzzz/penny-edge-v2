@@ -85,7 +85,7 @@ Runs process via Queue `penny-edge-analysis-jobs` in small pages (default 5). Sa
 
 ### Heat and Interest Scale (HIS)
 
-Product name for scheduled crash-heat scoring (0–100) of TAS snapshots. No Yahoo re-fetch — reads `analysis_json` hourly closes and writes `temperature` + component breakdown on `warm_symbols`.
+Product name for scheduled crash-heat scoring (0–100) of TAS snapshots. No Yahoo re-fetch — reads `analysis_json` hourly closes and writes `temperature` + component breakdown on `warm_symbols`. Only rescores symbols whose TAS (`analyzed_at`) is newer than the last HIS score (`temperature_at`), so a second run with no new TAS finishes immediately.
 
 | Method | Path | Notes |
 | --- | --- | --- |

@@ -1,6 +1,8 @@
 /**
  * Heat and Interest Scale (HIS) service.
  * Cron + queue scoring of TAS snapshots — no Yahoo re-fetch.
+ * Only rescores symbols whose TAS (`analyzed_at`) is newer than last HIS
+ * (`temperature_at`), or that have never been scored.
  */
 import { parseAnalysisJson } from "../analysis/types";
 import type { WarmSymbolRow } from "../scanners/types";
@@ -20,7 +22,7 @@ import {
   isTemperatureDue,
   listAllWarmSymbolsWithTemperature,
   listUnalertedCobutaSymbols,
-  listWarmSymbolsWithAnalysisPage,
+  listWarmSymbolsNeedingTemperaturePage,
   markCobutaAlerted,
   updateSymbolTemperature,
   updateTemperatureConfig,
@@ -303,9 +305,10 @@ export async function processTemperatureJob(
 
   try {
     const params = configParams(config);
-    const page = await listWarmSymbolsWithAnalysisPage(
+    // Only symbols with TAS newer than last HIS (or never scored). Drain
+    // with LIMIT batches — no OFFSET — because scoring bumps temperature_at.
+    const page = await listWarmSymbolsNeedingTemperaturePage(
       env.DB,
-      message.offset,
       run.page_size,
     );
 
@@ -335,7 +338,7 @@ export async function processTemperatureJob(
     const totalSucceeded = run.succeeded + succeeded;
     const totalFailed = run.failed + failed;
     const hasMore = page.length >= run.page_size;
-    const nextOffset = message.offset + run.page_size;
+    const nextOffset = scanned;
 
     await updateTemperatureRun(env.DB, run.id, {
       status: "running",

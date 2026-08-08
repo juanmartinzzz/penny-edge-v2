@@ -506,8 +506,9 @@ export function TemperaturePage() {
         </h1>
         <p>
           Reads <AcronymLabel acronym="TAS" layout="inline" /> hourly closes (no
-          Yahoo re-fetch) and scores crash-heat from 0–100. High = deep, sharp,
-          recent fall. Mid/low = stable or rising.
+          Yahoo re-fetch) and scores crash-heat from 0–100. Only rescores when
+          TAS is newer than the last score. High = deep, sharp, recent fall.
+          Mid/low = stable or rising.
         </p>
       </header>
 
