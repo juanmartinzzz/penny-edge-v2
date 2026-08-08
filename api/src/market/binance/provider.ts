@@ -15,7 +15,12 @@ import {
 import {
   COINGECKO_MAX_PAGES,
   COINGECKO_TICKERS_PAGE_SIZE,
+  coinGeckoDaysForRange,
   fetchCoinGeckoBinanceTickerPage,
+  fetchCoinGeckoMarketChart,
+  mapMarketChartPricesToBars,
+  marketChartIntervalFor,
+  resolveCoinGeckoCoinId,
 } from "./coingecko";
 import {
   mapCoinGeckoTickerToQuote,
@@ -23,12 +28,15 @@ import {
 } from "./map";
 
 /**
- * Binance venue market data via CoinGecko exchange tickers.
+ * Binance venue market data via CoinGecko.
+ * - EVG: Binance exchange tickers (venue volume)
+ * - TAS/SWATCH charts: coin-level market_chart (not Binance-exact klines)
  * Direct Binance REST is blocked from Cloudflare Worker egress (403/451).
- * Phase 1: screen + quotes for EVG. Charts deferred (getChart throws).
  */
 export class BinanceMarketDataProvider implements MarketDataProvider {
   readonly id = "binance" as const;
+
+  private readonly coinIdCache = new Map<string, string>();
 
   constructor(private readonly coinGeckoDemoApiKey: string) {}
 
@@ -72,6 +80,9 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
         if (!quote) continue;
         if (!wanted.has(quote.symbol)) continue;
         found.set(quote.symbol, quote);
+        if (ticker.coin_id && ticker.base) {
+          this.coinIdCache.set(ticker.base.trim().toUpperCase(), ticker.coin_id);
+        }
       }
 
       if (tickers.length < COINGECKO_TICKERS_PAGE_SIZE) break;
@@ -100,11 +111,50 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
 
   async getChart(
     ref: InstrumentRef,
-    _opts: { interval: Interval; range: Range },
+    opts: { interval: Interval; range: Range },
   ): Promise<ChartResult> {
-    throw new Error(
-      `Binance charts are not available yet for ${ref.symbol.trim().toUpperCase()} (Phase 1 uses CoinGecko tickers for EVG only; klines deferred)`,
+    this.requireKey();
+
+    const symbol = ref.symbol.trim().toUpperCase();
+    const parts = splitBinanceSymbol(symbol);
+    if (!parts) {
+      throw new Error(
+        `Cannot map ${symbol} to a CoinGecko coin (unknown quote suffix)`,
+      );
+    }
+
+    const coinId = await resolveCoinGeckoCoinId(
+      this.coinGeckoDemoApiKey,
+      parts.base,
+      this.coinIdCache,
     );
+
+    const days = coinGeckoDaysForRange(opts.range);
+    const interval = marketChartIntervalFor(opts.interval);
+    // For 1-day windows, hourly interval is unnecessary; auto ~5m is fine.
+    const chartInterval =
+      days === "1" && interval === "hourly" ? undefined : interval;
+
+    const chart = await fetchCoinGeckoMarketChart(
+      this.coinGeckoDemoApiKey,
+      coinId,
+      { days, interval: chartInterval },
+    );
+
+    const bars = mapMarketChartPricesToBars(chart.prices);
+    if (bars.length === 0) {
+      throw new Error(
+        `No CoinGecko market chart data for ${symbol} (${coinId}, ${days}d)`,
+      );
+    }
+
+    return {
+      symbol,
+      interval: opts.interval,
+      range: opts.range,
+      currency: "USD",
+      bars,
+    };
   }
 
   /**
@@ -141,6 +191,10 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
         const quote = mapCoinGeckoTickerToQuote(ticker);
         if (!quote) continue;
 
+        if (ticker.coin_id && ticker.base) {
+          this.coinIdCache.set(ticker.base.trim().toUpperCase(), ticker.coin_id);
+        }
+
         if (skipped < offset) {
           skipped += 1;
           continue;
@@ -159,7 +213,7 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
   private requireKey(): void {
     if (!this.coinGeckoDemoApiKey.trim()) {
       throw new Error(
-        "COINGECKO_DEMO_API_KEY is missing — required for Binance EVG via CoinGecko",
+        "COINGECKO_DEMO_API_KEY is missing — required for Binance via CoinGecko",
       );
     }
   }

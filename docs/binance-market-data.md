@@ -7,7 +7,7 @@ Read this when you’re unsure **which source we mean** and **why**.
 | Question | Whose answer? | Source today |
 | --- | --- | --- |
 | Which pairs are liquid / **WARM** on **Binance**? | Must be **Binance venue** volume | CoinGecko **exchange tickers for Binance** (not “crypto in general”) |
-| How has price been **trending** for TAS / charts? | **Coin-level** trend is enough (product decision 2026-08) | CoinGecko **coin** market chart / OHLC — **Phase 2, not wired yet** |
+| How has price been **trending** for TAS / charts? | **Coin-level** trend is enough (product decision 2026-08) | CoinGecko **coin** `market_chart` (**Phase 2 done**) |
 | Equities (TSX, NYSE, …)? | Unrelated to Binance | Yahoo (unchanged) |
 
 **Binance** = the exchange we care about for the warm list.  
@@ -28,7 +28,7 @@ TAS / SWATCH-style price path (Phase 2)
   “How did this coin’s price move over days/hours?”
   → coin trend is enough (BTC trend ≈ BTCUSDT for our use)
   → not required to be Binance’s own candles
-  → planned: CoinGecko coin market chart / OHLC
+  → CoinGecko `/coins/{id}/market_chart` (USD)
 ```
 
 ## When to insist on Binance-specific data
@@ -56,8 +56,8 @@ Product call (2026-08): we do **not** need candles that are guaranteed to be Bin
 | --- | --- |
 | Direct Worker → `api.binance.com` / `.vision` / `.us` | Blocked (451/403). Don’t plan on it. |
 | EVG via CoinGecko Binance tickers | **Done (Phase 1)** |
-| TAS/SWATCH charts via CoinGecko coin OHLC | **Phase 2** |
-| True Binance klines (if we ever need tape-exact) | Later optional (CoinAPI / Kaiko / egress IPs) — not required for current TAS bar |
+| TAS/SWATCH charts via CoinGecko coin `market_chart` | **Done (Phase 2)** |
+| True Binance klines (if we ever need tape-exact) | Optional later (CoinAPI / Kaiko / egress IPs) — not required |
 
 ## Phase 1 details (EVG)
 
@@ -70,7 +70,6 @@ Product call (2026-08): we do **not** need candles that are guaranteed to be Bin
 | Quote pills | `USDT`, `USDC`, `BTC`, `ETH`, `BNB`, `FDUSD`, `EUR`, `TRY`, `BRL`, `JPY` |
 | TradingView prefix | `BINANCE` |
 | Volume gate | Quote notional from 24h `converted_volume.usd` (stored as `volume_quote` / `avg_volume_10d_quote`; base coin volume kept separately) |
-| `getChart` | Throws until Phase 2 |
 
 Demo budget: ~100 calls/min, **10k calls/month** — keep Binance EVG cadence sane.
 
@@ -84,17 +83,26 @@ Demo budget: ~100 calls/min, **10k calls/month** — keep Binance EVG cadence sa
 
 API keys do not unlock public market data from a restricted egress IP.
 
+## Phase 2 details (TAS / SWATCH charts)
+
+| Item | Choice |
+| --- | --- |
+| Endpoint | `GET /api/v3/coins/{id}/market_chart?vs_currency=usd` |
+| Symbol map | `BTCUSDT` → base `BTC` → coin id `bitcoin` (well-known map + `/search`) |
+| Daily series | `interval=daily`, days from range (`1mo`→30, `3mo`→90, …) |
+| Hourly series | `interval=hourly` (Demo is hourly for multi-day windows) |
+| Bar shape | Synthetic OHLC with `o=h=l=c` from price points (TAS is close-based) |
+| Currency on chart | `USD` |
+
+~2 chart calls per warm symbol per TAS run (daily + hourly). Fine for a small warm set.
+
 ## Code map
 
 | Area | Path |
 | --- | --- |
 | Shared constants / quote pills | `shared/binance.ts` |
-| CoinGecko Binance tickers fetch | `api/src/market/binance/coingecko.ts` |
+| CoinGecko tickers + market_chart + coin id | `api/src/market/binance/coingecko.ts` |
 | Ticker → Quote mapping | `api/src/market/binance/map.ts` |
-| Provider (`screen` / `getQuotes`; chart TBD) | `api/src/market/binance/provider.ts` |
+| Provider (`screen` / `getQuotes` / `getChart`) | `api/src/market/binance/provider.ts` |
 | Yahoo vs Binance routing | `api/src/market/service.ts` |
 | Secret | `COINGECKO_DEMO_API_KEY` in `api/.dev.vars` + `wrangler secret put` |
-
-## Phase 2 (planned) — coin trends for TAS / SWATCH
-
-Wire `getChart` for Binance warm symbols to **CoinGecko coin** market chart / OHLC (map `BTCUSDT` → coin id, fetch bars). Same Demo key. No requirement for Binance-exact klines unless product needs change.

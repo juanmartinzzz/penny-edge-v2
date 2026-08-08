@@ -112,7 +112,7 @@ export function dailyRangeForLookback(lookbackDays: number): "1mo" | "3mo" | "6m
   return "6mo";
 }
 
-/** Build TAS analysis JSON from daily + hourly Yahoo bars (price-only). */
+/** Build TAS analysis JSON from daily + hourly bars (price-only). */
 export function buildSymbolAnalysis(input: {
   asOf: string;
   lookbackDays: number;

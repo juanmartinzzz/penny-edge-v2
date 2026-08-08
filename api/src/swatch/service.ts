@@ -596,11 +596,10 @@ async function executeSwatchRun(env: SwatchEnv, runId: string): Promise<void> {
         if (!move) {
           throw new Error(
             chart.bars.length < 2
-              ? `Yahoo returned ${chart.bars.length} hourly bar(s) — need at least 2 closes`
+              ? `Chart returned ${chart.bars.length} hourly bar(s) — need at least 2 closes`
               : "Could not span the window with available hourly closes",
           );
         }
-
         const moveBreached = moveBreachesThreshold(
           move.movePct,
           asset.threshold_pct,
