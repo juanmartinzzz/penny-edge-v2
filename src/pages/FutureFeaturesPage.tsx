@@ -17,6 +17,7 @@ import {
 } from "../lib/futureFeatures";
 import { formatDateTime } from "../lib/dates";
 import { FutureFeatureBodyCard } from "../lib/futureFeatureFormat";
+import { reportUiError } from "../lib/reportError";
 import "./FutureFeaturesPage.css";
 
 const CUSTOM_TYPE_VALUE = "__custom__";
@@ -290,7 +291,7 @@ export function FutureFeaturesPage() {
         if (!cancelled) setError(null);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load future features");
+          reportUiError(setError, err, "Failed to load future features", "FutureFeatures");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -368,7 +369,7 @@ export function FutureFeaturesPage() {
       await reload({ status: statusFilter, type: typeFilter, q: query.trim() });
       closeEditor();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save");
+      reportUiError(setError, err, "Failed to save", "FutureFeatures");
     } finally {
       setBusy(false);
     }
@@ -383,7 +384,7 @@ export function FutureFeaturesPage() {
       if (editingId === id) closeEditor();
       await reload({ status: statusFilter, type: typeFilter, q: query.trim() });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete");
+      reportUiError(setError, err, "Failed to delete", "FutureFeatures");
     } finally {
       setBusy(false);
     }
@@ -396,7 +397,7 @@ export function FutureFeaturesPage() {
       await updateFutureFeature(feature.id, { status });
       await reload({ status: statusFilter, type: typeFilter, q: query.trim() });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update status");
+      reportUiError(setError, err, "Failed to update status", "FutureFeatures");
     } finally {
       setBusy(false);
     }

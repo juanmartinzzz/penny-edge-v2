@@ -1,8 +1,14 @@
 import type { Bar, Interval, Quote, Range } from "../types";
 import { BINANCE_EXCHANGE_CODE } from "./constants";
 
-/** Prefer market-data-only host (no auth). */
-export const BINANCE_REST_BASE = "https://data-api.binance.vision";
+/** Prefer market-data-only host; fall back to api.binance.com if blocked. */
+export const BINANCE_REST_BASES = [
+  "https://data-api.binance.vision",
+  "https://api.binance.com",
+] as const;
+
+/** @deprecated use BINANCE_REST_BASES */
+export const BINANCE_REST_BASE = BINANCE_REST_BASES[0];
 
 export type BinanceExchangeSymbol = {
   symbol: string;

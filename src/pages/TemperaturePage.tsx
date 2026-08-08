@@ -34,6 +34,7 @@ import {
 import { PRODUCT_NAMES } from "../lib/productNames";
 import { formatDateTime } from "../lib/dates";
 import { generateTradingViewUrl } from "../lib/tradingView";
+import { logJobFailure, reportUiError } from "../lib/reportError";
 import "./TemperaturePage.css";
 
 type DraftState = {
@@ -225,7 +226,7 @@ export function TemperaturePage() {
         await Promise.all([refreshOverview(), refreshSymbols()]);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load HIS");
+          reportUiError(setError, err, "Failed to load HIS", "HIS");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -257,6 +258,13 @@ export function TemperaturePage() {
           );
 
           if (run.status === "ok" || run.status === "error") {
+            if (run.status === "error") {
+              logJobFailure("HIS", {
+                runId: run.id,
+                error: run.error,
+              });
+              setError(run.error?.trim() || "HIS run failed");
+            }
             await refreshOverview();
             await refreshSymbols();
           }
@@ -288,7 +296,7 @@ export function TemperaturePage() {
         params: paramsToDraft(next.config.params),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to toggle HIS");
+      reportUiError(setError, err, "Failed to toggle HIS", "HIS");
     } finally {
       setBusy(false);
     }
@@ -314,7 +322,7 @@ export function TemperaturePage() {
     try {
       await saveDraft();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save HIS settings");
+      reportUiError(setError, err, "Failed to save HIS settings", "HIS");
     } finally {
       setBusy(false);
     }
@@ -339,7 +347,7 @@ export function TemperaturePage() {
           : current,
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start HIS");
+      reportUiError(setError, err, "Failed to start HIS", "HIS");
     } finally {
       setBusy(false);
     }

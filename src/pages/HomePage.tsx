@@ -36,6 +36,7 @@ import {
   formatRelativeTime,
   formatTime,
 } from "../lib/dates";
+import { reportUiError } from "../lib/reportError";
 import "./HomePage.css";
 
 const JOB_RUN_PAGE_SIZE = 15;
@@ -193,7 +194,7 @@ export function HomePage() {
         await loadOverview();
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load overview");
+          reportUiError(setError, err, "Failed to load overview", "Home");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -215,7 +216,7 @@ export function HomePage() {
       await apiFetch("/market/auth/refresh", { method: "POST" });
       await loadOverview();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to refresh auth");
+      reportUiError(setError, err, "Failed to refresh auth", "Home");
     } finally {
       setAuthBusy(false);
     }

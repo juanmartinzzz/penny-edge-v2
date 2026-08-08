@@ -24,6 +24,7 @@ import {
 } from "../lib/analysis";
 import { PRODUCT_NAMES } from "../lib/productNames";
 import { formatDateTime } from "../lib/dates";
+import { logJobFailure, reportUiError } from "../lib/reportError";
 import "./AnalysisPage.css";
 
 function formatNumber(value: number | null | undefined): string {
@@ -123,7 +124,7 @@ export function AnalysisPage() {
         await Promise.all([refreshOverview(), refreshSymbols()]);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load TAS");
+          reportUiError(setError, err, "Failed to load TAS", "TAS");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -155,6 +156,13 @@ export function AnalysisPage() {
           );
 
           if (run.status === "ok" || run.status === "error") {
+            if (run.status === "error") {
+              logJobFailure("TAS", {
+                runId: run.id,
+                error: run.error,
+              });
+              setError(run.error?.trim() || "TAS run failed");
+            }
             await refreshOverview();
             await refreshSymbols();
           }
@@ -182,7 +190,7 @@ export function AnalysisPage() {
       const next = await updateAnalysis({ enabled: !overview.config.enabled });
       setOverview(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to toggle TAS");
+      reportUiError(setError, err, "Failed to toggle TAS", "TAS");
     } finally {
       setBusy(false);
     }
@@ -205,7 +213,7 @@ export function AnalysisPage() {
         rollHours: String(next.config.rollHours),
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save TAS settings");
+      reportUiError(setError, err, "Failed to save TAS settings", "TAS");
     } finally {
       setBusy(false);
     }
@@ -234,7 +242,7 @@ export function AnalysisPage() {
           : current,
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start TAS");
+      reportUiError(setError, err, "Failed to start TAS", "TAS");
     } finally {
       setBusy(false);
     }

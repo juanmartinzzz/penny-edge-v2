@@ -35,6 +35,7 @@ import {
 import { PillSelect } from "../components/interaction/PillSelect";
 import { PRODUCT_NAMES } from "../lib/productNames";
 import { formatDateTime } from "../lib/dates";
+import { logJobFailure, reportUiError } from "../lib/reportError";
 import "./ScannersPage.css";
 
 type ScannerDraft = {
@@ -214,7 +215,7 @@ export function ScannersPage() {
         await refreshList();
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load EVG");
+          reportUiError(setError, err, "Failed to load EVG", "EVG");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -247,6 +248,16 @@ export function ScannersPage() {
           if (cancelled) return;
 
           if (run.status === "ok" || run.status === "error") {
+            if (run.status === "error") {
+              logJobFailure("EVG", {
+                runId: run.id,
+                scannerId,
+                error: run.error,
+                scanned: run.scanned,
+                matched: run.matched,
+              });
+              setError(run.error?.trim() || "EVG run failed");
+            }
             await refreshDetail(scannerId);
             await refreshList();
             return;
@@ -290,7 +301,7 @@ export function ScannersPage() {
         ),
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update job");
+      reportUiError(setError, err, "Failed to update job", "EVG");
     } finally {
       setBusyId(null);
     }
@@ -331,7 +342,7 @@ export function ScannersPage() {
         [scanner.id]: draftFromScanner(updated),
       }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save settings");
+      reportUiError(setError, err, "Failed to save settings", "EVG");
     } finally {
       setBusyId(null);
     }
@@ -352,7 +363,7 @@ export function ScannersPage() {
       );
       await refreshDetail(scanner.id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start run");
+      reportUiError(setError, err, "Failed to start run", "EVG");
     } finally {
       setBusyId(null);
     }
@@ -680,10 +691,11 @@ export function ScannersPage() {
               onExpand={() => {
                 if (scanner.symbols) return;
                 void refreshDetail(scanner.id).catch((err) => {
-                  setError(
-                    err instanceof Error
-                      ? err.message
-                      : "Failed to load symbols",
+                  reportUiError(
+                    setError,
+                    err,
+                    "Failed to load symbols",
+                    "EVG",
                   );
                 });
               }}

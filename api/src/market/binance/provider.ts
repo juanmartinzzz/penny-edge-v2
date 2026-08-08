@@ -13,7 +13,7 @@ import {
   DEFAULT_BINANCE_QUOTE_ASSETS,
 } from "./constants";
 import {
-  BINANCE_REST_BASE,
+  BINANCE_REST_BASES,
   klineLimitFor,
   mapBinanceInterval,
   mapBinanceQuote,
@@ -25,26 +25,59 @@ import {
 
 const KLINE_CONCURRENCY = 8;
 
-async function fetchJson<T>(path: string, params?: Record<string, string>): Promise<T> {
-  const url = new URL(path, BINANCE_REST_BASE);
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
-      url.searchParams.set(key, value);
+const BINANCE_HEADERS: HeadersInit = {
+  Accept: "application/json",
+  "User-Agent":
+    "Mozilla/5.0 (compatible; PennyEdge/1.0; +https://github.com/juanmartinzzz/penny-edge-v2)",
+};
+
+async function fetchJson<T>(
+  path: string,
+  params?: Record<string, string>,
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (const base of BINANCE_REST_BASES) {
+    const url = new URL(path, base);
+    if (params) {
+      for (const [key, value] of Object.entries(params)) {
+        url.searchParams.set(key, value);
+      }
+    }
+
+    try {
+      const response = await fetch(url.toString(), {
+        headers: BINANCE_HEADERS,
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        lastError = new Error(
+          `Binance ${path} failed (${response.status}) via ${base}: ${text.slice(0, 200)}`,
+        );
+        // Try next host on geo/WAF style blocks.
+        if (response.status === 403 || response.status === 451) {
+          console.error(lastError.message);
+          continue;
+        }
+        throw lastError;
+      }
+
+      return (await response.json()) as T;
+    } catch (error) {
+      if (error instanceof Error && error !== lastError) {
+        lastError = error;
+        console.error(
+          `Binance ${path} network error via ${base}:`,
+          error.message,
+        );
+        continue;
+      }
+      throw error;
     }
   }
 
-  const response = await fetch(url.toString(), {
-    headers: { Accept: "application/json" },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Binance ${path} failed (${response.status}): ${text.slice(0, 200)}`,
-    );
-  }
-
-  return (await response.json()) as T;
+  throw lastError ?? new Error(`Binance ${path} failed on all hosts`);
 }
 
 async function mapPool<T, R>(

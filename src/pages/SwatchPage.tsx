@@ -39,6 +39,7 @@ import {
 import { PRODUCT_NAMES } from "../lib/productNames";
 import { formatDateTime } from "../lib/dates";
 import { generateTradingViewUrl } from "../lib/tradingView";
+import { logJobFailure, reportUiError } from "../lib/reportError";
 import "./SwatchPage.css";
 
 type DraftTrigger = {
@@ -227,7 +228,7 @@ export function SwatchPage() {
         await refresh();
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load SWATCH");
+          reportUiError(setError, err, "Failed to load SWATCH", "SWATCH");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -255,6 +256,13 @@ export function SwatchPage() {
             current ? { ...current, activeRun: run } : current,
           );
           if (run.status === "ok" || run.status === "error") {
+            if (run.status === "error") {
+              logJobFailure("SWATCH", {
+                runId: run.id,
+                error: run.error,
+              });
+              setError(run.error?.trim() || "SWATCH run failed");
+            }
             await refresh();
           }
         } catch {
@@ -307,7 +315,7 @@ export function SwatchPage() {
       const next = await updateSwatch({ enabled: !overview.config.enabled });
       setOverview(next);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to toggle SWATCH");
+      reportUiError(setError, err, "Failed to toggle SWATCH", "SWATCH");
     } finally {
       setBusy(false);
     }
@@ -323,7 +331,7 @@ export function SwatchPage() {
       setOverview(next);
       setIntervalHours(String(next.config.intervalHours));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save schedule");
+      reportUiError(setError, err, "Failed to save schedule", "SWATCH");
     } finally {
       setBusy(false);
     }
@@ -354,10 +362,17 @@ export function SwatchPage() {
           : current,
       );
       if (run.status === "ok" || run.status === "error") {
+        if (run.status === "error") {
+          logJobFailure("SWATCH", {
+            runId: run.id,
+            error: run.error,
+          });
+          setError(run.error?.trim() || "SWATCH run failed");
+        }
         await refresh();
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to start SWATCH");
+      reportUiError(setError, err, "Failed to start SWATCH", "SWATCH");
     } finally {
       setBusy(false);
     }
@@ -396,7 +411,7 @@ export function SwatchPage() {
       setAddingAsset(false);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add asset");
+      reportUiError(setError, err, "Failed to add asset", "SWATCH");
     } finally {
       setBusy(false);
     }
@@ -418,7 +433,7 @@ export function SwatchPage() {
       });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update asset");
+      reportUiError(setError, err, "Failed to update asset", "SWATCH");
     } finally {
       setBusy(false);
     }
@@ -431,7 +446,7 @@ export function SwatchPage() {
       await updateSwatchAsset(asset.id, { enabled: !asset.enabled });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to toggle asset");
+      reportUiError(setError, err, "Failed to toggle asset", "SWATCH");
     } finally {
       setBusy(false);
     }
@@ -450,7 +465,7 @@ export function SwatchPage() {
       });
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete asset");
+      reportUiError(setError, err, "Failed to delete asset", "SWATCH");
     } finally {
       setBusy(false);
     }
