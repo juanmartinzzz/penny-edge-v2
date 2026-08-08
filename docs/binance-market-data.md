@@ -2,17 +2,38 @@
 
 ## Decision (2026-08)
 
-Penny Edge uses **Binance.US** public REST (`https://api.binance.us`) for crypto market data — not global Binance (`api.binance.com` / `data-api.binance.vision`).
+Penny Edge is wired for **global Binance** public REST:
 
 | Item | Choice |
 | --- | --- |
-| Host | `https://api.binance.us` |
+| Hosts | `https://data-api.binance.vision`, then `https://api.binance.com` |
 | Auth for market data | None (public endpoints) |
-| EVG exchange code | `BINANCE` (stable id in D1 / warm symbols) |
-| EVG label | `Binance.US` |
+| EVG exchange code | `BINANCE` |
+| EVG label | `Binance` |
 | Default quote market | `USDT` |
-| Available quote pills | `USDT`, `USD`, `USDC`, `BTC` |
-| TradingView prefix | `BINANCEUS` |
+| Available quote pills | `USDT`, `USDC`, `BTC`, `ETH`, `BNB`, `FDUSD`, `EUR`, `TRY`, `BRL`, `JPY` |
+| TradingView prefix | `BINANCE` |
+
+### Tried Binance.US — also blocked from Workers (2026-08-08)
+
+We briefly switched to `https://api.binance.us`. Production EVG still failed:
+
+```text
+Binance /api/v3/exchangeInfo failed (403) via https://api.binance.us
+(HTML WAF / ERROR page — not a JSON API error)
+```
+
+Code was reverted to **global** hosts. Both venues reject typical Cloudflare Worker outbound IPs:
+
+| Host | From Worker | Typical signal |
+| --- | --- | --- |
+| `api.binance.com` | Blocked | **451** eligibility / restricted location |
+| `data-api.binance.vision` | Blocked | **403** HTML Forbidden |
+| `api.binance.us` | Blocked | **403** HTML WAF (`ERROR` page) |
+
+The same URLs often return **200** from a normal residential/laptop IP. This is an **egress IP / WAF / eligibility** problem, not a wrong path or missing API key.
+
+**Implication under a Cloudflare-only constraint:** direct Worker → Binance (global or US) market data is not currently viable. Next options: Cloudflare Dedicated Egress IPs, a non-CF proxy, or an **aggregator that serves Binance venue data** (e.g. CoinGecko `/exchanges/binance/tickers`, CoinAPI) reachable from Workers.
 
 ## Why not global Binance?
 
@@ -72,9 +93,12 @@ Majors (`BTCUSDT`, `ETHUSDT`, `SOLUSDT`, etc.) exist on both. Long-tail USDT alt
 
 ## Revisit later
 
-If we need the **full global** USDT set while staying on Cloudflare:
+Direct Worker → Binance (global **or** US) is blocked as of 2026-08-08.
 
-1. Evaluate **Cloudflare Dedicated Egress IPs** (egress from a non-restricted city), or
-2. Accept a small non-CF proxy in an eligible region (breaks the Cloudflare-only rule).
+If we need Binance USDT venue volume while staying on Cloudflare:
 
-Until then, keep `BINANCE_REST_BASES` pointed at `api.binance.us` only.
+1. **Aggregator with Binance venue data** reachable from Workers (CoinGecko `/exchanges/binance/tickers`, CoinAPI `BINANCE_SPOT_*`, etc.), or
+2. **Cloudflare Dedicated Egress IPs** (Zero Trust), or
+3. A small non-CF proxy in an eligible region.
+
+Until one of those lands, keep `BINANCE_REST_BASES` on global hosts; EVG Binance runs will keep failing at fetch even though product wiring is correct.

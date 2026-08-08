@@ -39,7 +39,7 @@ export const SWATCH_EXCHANGES = [
   { value: "NMS", label: "NASDAQ (NMS)" },
   { value: "ASE", label: "AMEX (ASE)" },
   { value: "PCX", label: "Pacific (PCX)" },
-  { value: "BINANCE", label: "Binance.US" },
+  { value: "BINANCE", label: "Binance" },
 ] as const;
 
 export interface SwatchConfigRow {

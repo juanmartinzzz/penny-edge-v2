@@ -19,7 +19,7 @@ export interface MarketEnv {
 }
 
 /**
- * Routes by instrument/exchange: Binance.US codes → api.binance.us,
+ * Routes by instrument/exchange: Binance codes → global Binance public REST,
  * everything else → Yahoo.
  */
 export class RoutingMarketDataProvider implements MarketDataProvider {

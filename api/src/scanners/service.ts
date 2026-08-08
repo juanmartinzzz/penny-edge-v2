@@ -162,7 +162,7 @@ export async function patchScanner(
 
   if (body.enabledQuoteAssets !== undefined) {
     if (!isBinanceExchange(scanner.code)) {
-      throw new Error("enabledQuoteAssets is only supported for Binance.US");
+      throw new Error("enabledQuoteAssets is only supported for Binance");
     }
     if (!Array.isArray(body.enabledQuoteAssets)) {
       throw new Error("enabledQuoteAssets must be an array of quote assets");

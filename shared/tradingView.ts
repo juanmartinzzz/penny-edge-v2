@@ -30,8 +30,7 @@ function tradingViewExchange(exchange: string | null): string {
       return "NASDAQ";
     case "BINANCE":
     case "BIN":
-    case "BINANCEUS":
-      return "BINANCEUS";
+      return "BINANCE";
     default:
       return exchange.toUpperCase();
   }

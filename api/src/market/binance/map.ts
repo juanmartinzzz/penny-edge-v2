@@ -1,8 +1,15 @@
 import type { Bar, Interval, Quote, Range } from "../types";
 import { BINANCE_EXCHANGE_CODE } from "./constants";
 
-/** Binance.US public REST — reachable from Cloudflare Worker egress. */
-export const BINANCE_REST_BASES = ["https://api.binance.us"] as const;
+/**
+ * Global Binance public REST hosts.
+ * Note: Cloudflare Worker egress is often geo/WAF blocked (451/403).
+ * See docs/binance-market-data.md.
+ */
+export const BINANCE_REST_BASES = [
+  "https://data-api.binance.vision",
+  "https://api.binance.com",
+] as const;
 
 /** @deprecated use BINANCE_REST_BASES */
 export const BINANCE_REST_BASE = BINANCE_REST_BASES[0];
