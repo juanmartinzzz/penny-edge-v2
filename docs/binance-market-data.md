@@ -73,6 +73,11 @@ Product call (2026-08): we do **not** need candles that are guaranteed to be Bin
 
 Demo budget: ~100 calls/min, **10k calls/month** — keep Binance EVG cadence sane.
 
+**Rate limiting:** all CoinGecko calls (EVG tickers, TAS/SWATCH charts, coin id search)
+go through a shared Durable Object token bucket (`CoinGeckoRateLimiter`, ~80/min with
+burst 8) plus 429 retry with `Retry-After` / exponential backoff. See
+`api/src/market/binance/rate-limiter.ts`.
+
 ### Why not direct Binance REST?
 
 | Host | From Worker |
@@ -94,7 +99,8 @@ API keys do not unlock public market data from a restricted egress IP.
 | Bar shape | Synthetic OHLC with `o=h=l=c` from price points (TAS is close-based) |
 | Currency on chart | `USD` |
 
-~2 chart calls per warm symbol per TAS run (daily + hourly). Fine for a small warm set.
+~2 chart calls per warm symbol per TAS run (daily + hourly). Fine for a small warm set
+when paced by the shared DO limiter; still watch the **10k/month** Demo credit.
 
 ## Code map
 
@@ -102,7 +108,9 @@ API keys do not unlock public market data from a restricted egress IP.
 | --- | --- |
 | Shared constants / quote pills | `shared/binance.ts` |
 | CoinGecko tickers + market_chart + coin id | `api/src/market/binance/coingecko.ts` |
+| Shared Demo rate limiter (DO) | `api/src/market/binance/rate-limiter.ts` |
 | Ticker → Quote mapping | `api/src/market/binance/map.ts` |
 | Provider (`screen` / `getQuotes` / `getChart`) | `api/src/market/binance/provider.ts` |
 | Yahoo vs Binance routing | `api/src/market/service.ts` |
 | Secret | `COINGECKO_DEMO_API_KEY` in `api/.dev.vars` + `wrangler secret put` |
+| DO binding | `COINGECKO_RATE_LIMITER` → `CoinGeckoRateLimiter` in `api/wrangler.jsonc` |

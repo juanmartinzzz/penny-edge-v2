@@ -60,5 +60,19 @@
         "max_batch_timeout": 5
       }
     ]
-  }
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "COINGECKO_RATE_LIMITER",
+        "class_name": "CoinGeckoRateLimiter"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-coingecko-rate-limiter",
+      "new_sqlite_classes": ["CoinGeckoRateLimiter"]
+    }
+  ]
 }

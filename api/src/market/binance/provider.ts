@@ -21,11 +21,13 @@ import {
   mapMarketChartPricesToBars,
   marketChartIntervalFor,
   resolveCoinGeckoCoinId,
+  type CoinGeckoFetchOptions,
 } from "./coingecko";
 import {
   mapCoinGeckoTickerToQuote,
   splitBinanceSymbol,
 } from "./map";
+import type { CoinGeckoRateLimiterStub } from "./rate-limiter";
 
 /**
  * Binance venue market data via CoinGecko.
@@ -37,8 +39,14 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
   readonly id = "binance" as const;
 
   private readonly coinIdCache = new Map<string, string>();
+  private readonly fetchOpts: CoinGeckoFetchOptions;
 
-  constructor(private readonly coinGeckoDemoApiKey: string) {}
+  constructor(
+    private readonly coinGeckoDemoApiKey: string,
+    rateLimiter?: CoinGeckoRateLimiterStub,
+  ) {
+    this.fetchOpts = rateLimiter ? { rateLimiter } : {};
+  }
 
   async getAuthStatus(): Promise<ProviderAuthStatus> {
     const present = Boolean(this.coinGeckoDemoApiKey.trim());
@@ -72,6 +80,7 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
       const tickers = await fetchCoinGeckoBinanceTickerPage(
         this.coinGeckoDemoApiKey,
         page,
+        this.fetchOpts,
       );
       if (tickers.length === 0) break;
 
@@ -127,6 +136,7 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
       this.coinGeckoDemoApiKey,
       parts.base,
       this.coinIdCache,
+      this.fetchOpts,
     );
 
     const days = coinGeckoDaysForRange(opts.range);
@@ -139,6 +149,7 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
       this.coinGeckoDemoApiKey,
       coinId,
       { days, interval: chartInterval },
+      this.fetchOpts,
     );
 
     const bars = mapMarketChartPricesToBars(chart.prices);
@@ -181,6 +192,7 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
       const tickers = await fetchCoinGeckoBinanceTickerPage(
         this.coinGeckoDemoApiKey,
         page,
+        this.fetchOpts,
       );
       if (tickers.length === 0) break;
 

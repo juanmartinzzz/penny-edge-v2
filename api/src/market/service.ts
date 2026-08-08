@@ -10,6 +10,10 @@ import type {
 } from "./types";
 import { BinanceMarketDataProvider } from "./binance/provider";
 import { isBinanceExchange } from "./binance/constants";
+import {
+  getCoinGeckoRateLimiter,
+  type CoinGeckoRateLimiterNamespace,
+} from "./binance/rate-limiter";
 import { YahooMarketDataProvider } from "./yahoo/provider";
 
 export interface MarketEnv {
@@ -18,6 +22,8 @@ export interface MarketEnv {
   YAHOO_STALE_AFTER_MINUTES?: string;
   /** Demo key for CoinGecko Binance venue tickers (EVG). */
   COINGECKO_DEMO_API_KEY?: string;
+  /** Shared DO token-bucket for CoinGecko Demo rate limits. */
+  COINGECKO_RATE_LIMITER: CoinGeckoRateLimiterNamespace;
 }
 
 /**
@@ -118,6 +124,7 @@ export function createMarketDataService(env: MarketEnv): MarketDataService {
   const yahoo = new YahooMarketDataProvider(env.DB, staleAfterMinutes);
   const binance = new BinanceMarketDataProvider(
     env.COINGECKO_DEMO_API_KEY?.trim() ?? "",
+    getCoinGeckoRateLimiter(env.COINGECKO_RATE_LIMITER),
   );
 
   return new MarketDataService(new RoutingMarketDataProvider(yahoo, binance));

@@ -63,6 +63,9 @@ import {
   type SwatchEnv,
 } from "./swatch/service";
 
+// Durable Object class must be exported from the Worker entrypoint.
+export { CoinGeckoRateLimiter } from "./market/binance/rate-limiter";
+
 type AppBindings = ScannerEnv &
   AnalysisEnv &
   TemperatureEnv &

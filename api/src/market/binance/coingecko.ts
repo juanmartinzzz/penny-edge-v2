@@ -7,6 +7,7 @@
  */
 
 import type { Bar, Interval, Range } from "../types";
+import type { CoinGeckoRateLimiterStub } from "./rate-limiter";
 
 export const COINGECKO_API_BASE = "https://api.coingecko.com/api/v3";
 
@@ -17,6 +18,9 @@ export const COINGECKO_TICKERS_PAGE_SIZE = 100;
 
 /** Safety cap so a runaway screen cannot burn the Demo monthly credit. */
 export const COINGECKO_MAX_PAGES = 40;
+
+/** Max attempts for a single CoinGecko call (includes first try). */
+const COINGECKO_MAX_ATTEMPTS = 6;
 
 const UA =
   "Mozilla/5.0 (compatible; PennyEdge/1.0; +https://github.com/juanmartinzzz/penny-edge-v2)";
@@ -89,6 +93,10 @@ type CoinGeckoSearchCoin = {
   market_cap_rank?: number | null;
 };
 
+export type CoinGeckoFetchOptions = {
+  rateLimiter?: CoinGeckoRateLimiterStub;
+};
+
 function demoHeaders(apiKey: string): HeadersInit {
   return {
     Accept: "application/json",
@@ -97,10 +105,32 @@ function demoHeaders(apiKey: string): HeadersInit {
   };
 }
 
+/** Parse Retry-After as seconds or HTTP-date; returns wait ms (capped). */
+export function retryAfterMs(
+  header: string | null,
+  attempt: number,
+): number {
+  const fallback = Math.min(30_000, 1_000 * 2 ** attempt);
+  if (!header) return fallback;
+
+  const asSeconds = Number(header);
+  if (Number.isFinite(asSeconds) && asSeconds >= 0) {
+    return Math.min(60_000, Math.ceil(asSeconds * 1_000));
+  }
+
+  const asDate = Date.parse(header);
+  if (Number.isFinite(asDate)) {
+    return Math.min(60_000, Math.max(0, asDate - Date.now()));
+  }
+
+  return fallback;
+}
+
 async function fetchCoinGeckoJson<T>(
   apiKey: string,
   path: string,
   params?: Record<string, string>,
+  opts?: CoinGeckoFetchOptions,
 ): Promise<T> {
   const url = new URL(path.startsWith("http") ? path : `${COINGECKO_API_BASE}${path}`);
   if (params) {
@@ -109,24 +139,56 @@ async function fetchCoinGeckoJson<T>(
     }
   }
 
-  const response = await fetch(url.toString(), { headers: demoHeaders(apiKey) });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `CoinGecko ${url.pathname} failed (${response.status}): ${text.slice(0, 200)}`,
-    );
+  let lastError: Error | undefined;
+
+  for (let attempt = 0; attempt < COINGECKO_MAX_ATTEMPTS; attempt++) {
+    if (opts?.rateLimiter) {
+      await opts.rateLimiter.acquire();
+    }
+
+    const response = await fetch(url.toString(), { headers: demoHeaders(apiKey) });
+
+    if (response.status === 429) {
+      const text = await response.text();
+      const waitMs =
+        retryAfterMs(response.headers.get("retry-after"), attempt) +
+        Math.floor(Math.random() * 250);
+      lastError = new Error(
+        `CoinGecko ${url.pathname} rate limited (429): ${text.slice(0, 200)}`,
+      );
+      console.warn(
+        `CoinGecko 429 on ${url.pathname}; backing off ${waitMs}ms (attempt ${attempt + 1}/${COINGECKO_MAX_ATTEMPTS})`,
+      );
+      if (opts?.rateLimiter) {
+        await opts.rateLimiter.penalize(waitMs);
+      }
+      await scheduler.wait(waitMs);
+      continue;
+    }
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(
+        `CoinGecko ${url.pathname} failed (${response.status}): ${text.slice(0, 200)}`,
+      );
+    }
+
+    return (await response.json()) as T;
   }
-  return (await response.json()) as T;
+
+  throw lastError ?? new Error(`CoinGecko ${url.pathname} retries exhausted`);
 }
 
 export async function fetchCoinGeckoBinanceTickerPage(
   apiKey: string,
   page: number,
+  opts?: CoinGeckoFetchOptions,
 ): Promise<CoinGeckoBinanceTicker[]> {
   const body = await fetchCoinGeckoJson<CoinGeckoTickersResponse>(
     apiKey,
     "/exchanges/binance/tickers",
     { page: String(page), order: "volume_desc" },
+    opts,
   );
   return Array.isArray(body.tickers) ? body.tickers : [];
 }
@@ -139,6 +201,7 @@ export async function resolveCoinGeckoCoinId(
   apiKey: string,
   baseAsset: string,
   cache?: Map<string, string>,
+  opts?: CoinGeckoFetchOptions,
 ): Promise<string> {
   const base = baseAsset.trim().toUpperCase();
   if (!base) throw new Error("Missing base asset for CoinGecko coin id");
@@ -156,6 +219,7 @@ export async function resolveCoinGeckoCoinId(
     apiKey,
     "/search",
     { query: base },
+    opts,
   );
 
   const exact = (body.coins ?? []).filter(
@@ -207,18 +271,20 @@ export function coinGeckoDaysForRange(range: Range): string {
 export async function fetchCoinGeckoMarketChart(
   apiKey: string,
   coinId: string,
-  opts: { days: string; interval?: "daily" | "hourly" },
+  chartOpts: { days: string; interval?: "daily" | "hourly" },
+  fetchOpts?: CoinGeckoFetchOptions,
 ): Promise<CoinGeckoMarketChartResponse> {
   const params: Record<string, string> = {
     vs_currency: "usd",
-    days: opts.days,
+    days: chartOpts.days,
   };
-  if (opts.interval) params.interval = opts.interval;
+  if (chartOpts.interval) params.interval = chartOpts.interval;
 
   return fetchCoinGeckoJson<CoinGeckoMarketChartResponse>(
     apiKey,
     `/coins/${encodeURIComponent(coinId)}/market_chart`,
     params,
+    fetchOpts,
   );
 }
 
