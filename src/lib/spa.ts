@@ -11,7 +11,7 @@ export type SpaApiCall = {
   pageOffset: number;
   pageSize: number;
   quoteCount: number;
-  /** Actual Yahoo / CoinGecko HTTP requests for this job chunk. */
+  /** Actual Yahoo Finance / CoinGecko HTTP requests made for this symbol batch. */
   upstreamRequests?: number;
   latencyMs: number;
   ok: boolean;
@@ -42,10 +42,10 @@ export type SpaSampleMeta = {
   runId: string;
   sampledAt: string;
   symbolCount: number;
-  /** Upstream Yahoo/CoinGecko HTTP requests. */
-  callCount: number;
-  /** SPA queue job chunks (optional on older payloads). */
-  jobChunks?: number;
+  /** Calls made to Yahoo or CoinGecko. */
+  priceFeedCalls: number;
+  /** How many symbol batches were pulled to cover the exchange. */
+  batchCount: number;
   createdAt: string;
 };
 

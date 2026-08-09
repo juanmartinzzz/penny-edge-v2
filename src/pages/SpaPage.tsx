@@ -92,13 +92,18 @@ function draftMatches(exchange: SpaExchange, draft: SpaDraft): boolean {
   return true;
 }
 
+function externalApiName(exchangeCode: string): string {
+  return isBinanceExchange(exchangeCode) ? "CoinGecko" : "Yahoo";
+}
+
 function runLabel(run: SpaRun | null, exchange: SpaExchange): string {
   if (run && (run.status === "queued" || run.status === "running")) {
-    const upstream = run.calls.reduce(
+    const apiCalls = run.calls.reduce(
       (sum, call) => sum + (call.upstreamRequests ?? 1),
       0,
     );
-    return `${run.status} · ${run.scanned} quotes · ${upstream} upstream · ${run.pages} jobs`;
+    const api = externalApiName(exchange.code);
+    return `${run.status} · ${run.scanned} symbols · ${apiCalls} ${api} API calls · ${run.pages} symbol batches`;
   }
   if (exchange.lastRunStatus === "error" && exchange.lastRunError) {
     return exchange.lastRunError;
@@ -109,78 +114,98 @@ function runLabel(run: SpaRun | null, exchange: SpaExchange): string {
   return "Never sampled";
 }
 
-const sampleColumns: TableColumn<SpaSampleMeta>[] = [
-  {
-    id: "sampledAt",
-    header: "Sampled",
-    accessor: (row) => row.sampledAt,
-    cell: (row) => formatDateTime(row.sampledAt),
-  },
-  {
-    id: "symbolCount",
-    header: "Symbols",
-    align: "right",
-    accessor: (row) => row.symbolCount,
-  },
-  {
-    id: "callCount",
-    header: "Upstream",
-    align: "right",
-    accessor: (row) => row.callCount,
-    cell: (row) => {
-      const chunks = row.jobChunks;
-      if (chunks != null && chunks !== row.callCount) {
-        return `${row.callCount} (${chunks} jobs)`;
-      }
-      return String(row.callCount);
-    },
-  },
-];
+function endpointLabel(endpoint: string): string {
+  if (endpoint === "yahoo.screener") return "Yahoo";
+  if (endpoint === "coingecko.tickers") return "CoinGecko";
+  return endpoint;
+}
 
-const callColumns: TableColumn<SpaApiCall>[] = [
-  {
-    id: "at",
-    header: "Time",
-    accessor: (row) => row.at,
-    cell: (row) => formatDateTime(row.at),
-  },
-  {
-    id: "endpoint",
-    header: "Endpoint",
-    accessor: (row) => row.endpoint,
-  },
-  {
-    id: "upstream",
-    header: "Upstream",
-    align: "right",
-    accessor: (row) => row.upstreamRequests ?? 1,
-  },
-  {
-    id: "page",
-    header: "Job chunk",
-    align: "right",
-    accessor: (row) => row.pageOffset,
-    cell: (row) => `${row.pageOffset}+${row.pageSize}`,
-  },
-  {
-    id: "quotes",
-    header: "Quotes",
-    align: "right",
-    accessor: (row) => row.quoteCount,
-  },
-  {
-    id: "latency",
-    header: "Latency",
-    align: "right",
-    accessor: (row) => row.latencyMs,
-    cell: (row) => `${row.latencyMs}ms`,
-  },
-  {
-    id: "ok",
-    header: "Result",
-    accessor: (row) => (row.ok ? "ok" : "error"),
-  },
-];
+/** Human range for a batch window, e.g. offset 0 with 100 symbols → "1–100". */
+function batchSymbolRange(offset: number, quoteCount: number): string {
+  if (quoteCount <= 0) return "—";
+  const start = offset + 1;
+  const end = offset + quoteCount;
+  return `${start}–${end}`;
+}
+
+function sampleColumnsFor(exchangeCode: string): TableColumn<SpaSampleMeta>[] {
+  const api = externalApiName(exchangeCode);
+  return [
+    {
+      id: "sampledAt",
+      header: "Sampled",
+      accessor: (row) => row.sampledAt,
+      cell: (row) => formatDateTime(row.sampledAt),
+    },
+    {
+      id: "symbolCount",
+      header: "Symbols",
+      align: "right",
+      accessor: (row) => row.symbolCount,
+    },
+    {
+      id: "priceFeedCalls",
+      header: `${api} API calls`,
+      align: "right",
+      accessor: (row) => row.priceFeedCalls,
+    },
+    {
+      id: "batchCount",
+      header: "Symbol batches",
+      align: "right",
+      accessor: (row) => row.batchCount,
+    },
+  ];
+}
+
+function callColumnsFor(exchangeCode: string): TableColumn<SpaApiCall>[] {
+  const api = externalApiName(exchangeCode);
+  return [
+    {
+      id: "at",
+      header: "Time",
+      accessor: (row) => row.at,
+      cell: (row) => formatDateTime(row.at),
+    },
+    {
+      id: "endpoint",
+      header: "API",
+      accessor: (row) => row.endpoint,
+      cell: (row) => endpointLabel(row.endpoint),
+    },
+    {
+      id: "priceFeedCalls",
+      header: `${api} API calls`,
+      align: "right",
+      accessor: (row) => row.upstreamRequests ?? 1,
+    },
+    {
+      id: "batch",
+      header: "Symbol range",
+      align: "right",
+      accessor: (row) => row.pageOffset,
+      cell: (row) => batchSymbolRange(row.pageOffset, row.quoteCount),
+    },
+    {
+      id: "quotes",
+      header: "Symbols in batch",
+      align: "right",
+      accessor: (row) => row.quoteCount,
+    },
+    {
+      id: "latency",
+      header: "Took",
+      align: "right",
+      accessor: (row) => row.latencyMs,
+      cell: (row) => `${row.latencyMs}ms`,
+    },
+    {
+      id: "ok",
+      header: "Result",
+      accessor: (row) => (row.ok ? "ok" : "error"),
+    },
+  ];
+}
 
 const priceColumns: TableColumn<SpaPrice>[] = [
   {
@@ -212,11 +237,13 @@ const priceColumns: TableColumn<SpaPrice>[] = [
 
 function SpaSampleExpanded({
   sampleId,
+  exchangeCode,
   detail,
   loading,
   onNeedLoad,
 }: {
   sampleId: string;
+  exchangeCode: string;
   detail: SpaSampleDetail | undefined;
   loading: boolean;
   onNeedLoad: (sampleId: string) => void;
@@ -238,7 +265,7 @@ function SpaSampleExpanded({
       <TableExpandableRows
         id={`spa.sample-calls.${detail.id}`}
         rows={detail.calls}
-        columns={callColumns}
+        columns={callColumnsFor(exchangeCode)}
         getRowId={(call) => `${call.at}-${call.pageOffset}`}
         compact
         empty={<p className="spa-empty">No call log.</p>}
@@ -630,19 +657,20 @@ export function SpaPage() {
         id: "samples",
         title: "Recent samples",
         description:
-          "Each row is one exchange-wide snapshot. Expand for upstream requests + prices.",
+          `Each row is one full-exchange price snapshot. Expand for ${externalApiName(exchange.code)} API call log and prices.`,
         columns: [
           <TableExpandableRows
             key="samples"
             id={`spa.samples.${exchange.code}`}
             rows={exchange.recentSamples ?? []}
-            columns={sampleColumns}
+            columns={sampleColumnsFor(exchange.code)}
             getRowId={(row) => row.id}
             compact
             initialSort={[{ columnId: "sampledAt", direction: "desc" }]}
             renderExpanded={(row) => (
               <SpaSampleExpanded
                 sampleId={row.id}
+                exchangeCode={exchange.code}
                 detail={sampleDetails[row.id]}
                 loading={loadingSampleId === row.id}
                 onNeedLoad={(id) => {
@@ -661,20 +689,20 @@ export function SpaPage() {
     );
 
     if (opts.running && liveCalls.length > 0) {
+      const api = externalApiName(exchange.code);
       sections.push({
         id: "live-calls",
-        title: "Live upstream requests",
-        description:
-          "Yahoo/CoinGecko HTTP calls in the active run (job chunks are Worker packaging).",
+        title: `Live ${api} API calls`,
+        description: `${api} API calls while this sample is running. Each row is one symbol batch.`,
         columns: [
           <TableExpandableRows
             key="live-calls"
             id={`spa.live-calls.${exchange.code}`}
             rows={liveCalls}
-            columns={callColumns}
+            columns={callColumnsFor(exchange.code)}
             getRowId={(row) => `${row.at}-${row.pageOffset}`}
             compact
-            empty={<p className="spa-empty">Waiting for first page…</p>}
+            empty={<p className="spa-empty">Waiting for first batch…</p>}
           />,
         ],
       });

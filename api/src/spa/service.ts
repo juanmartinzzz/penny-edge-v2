@@ -565,10 +565,10 @@ function serializeSampleMeta(
     runId: sample.run_id,
     sampledAt: sample.sampled_at,
     symbolCount: sample.symbol_count,
-    /** Vendor Yahoo/CoinGecko HTTP requests (primary cost signal). */
-    callCount: sumUpstreamRequests(calls),
-    /** SPA queue job chunks (secondary). */
-    jobChunks: calls.length,
+    /** Calls to Yahoo Finance or CoinGecko. */
+    priceFeedCalls: sumUpstreamRequests(calls),
+    /** Symbol batches pulled to cover the exchange. */
+    batchCount: calls.length,
     createdAt: sample.created_at,
   };
 }
