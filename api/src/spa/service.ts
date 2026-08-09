@@ -348,60 +348,81 @@ export async function processSpaJob(
       quoteAssets,
     });
 
-    const call: SpaApiCall = {
-      at: nowIso(),
-      endpoint: isBinanceExchange(exchange.code)
-        ? "coingecko.tickers"
-        : "yahoo.screener",
-      // Symbol index for UI ranges (not the provider cursor).
-      pageOffset: run.scanned,
-      pageSize: run.page_size,
-      quoteCount: page.length,
-      upstreamRequests,
-      latencyMs: Date.now() - startedMs,
-      ok: true,
-    };
+    let calls = parseCallsJson(run.calls_json);
+    let scanned = run.scanned;
+    let pages = run.pages;
 
-    const quotes: SpaPricePoint[] = page.map((quote) => ({
-      s: quote.symbol,
-      p: quote.price,
-      ...(quote.volume != null ? { v: quote.volume } : {}),
-      ...(quote.name ? { n: quote.name } : {}),
-    }));
-
-    await insertSpaRunPage(env.DB, {
-      id: crypto.randomUUID(),
-      runId: run.id,
-      pageOffset: run.scanned,
-      quotes,
-      call,
-    });
-
-    const calls = [...parseCallsJson(run.calls_json), call];
-    const scanned = run.scanned + page.length;
-    const pages = run.pages + 1;
-
-    await updateSpaRun(env.DB, run.id, {
-      status: "running",
-      offset: nextOffset,
-      scanned,
-      pages,
-      calls_json: JSON.stringify(calls),
-    });
-
-    await updateSpaExchange(env.DB, exchange.id, {
-      last_run_scanned: scanned,
-      last_run_status: "running",
-    });
-
-    if (hasMore) {
-      await env.SPA_QUEUE.send({
-        type: "spa_page",
-        runId: run.id,
-        exchangeId: exchange.id,
+    // Skip empty vendor windows (no matching quote assets) — don't log a blank row.
+    if (page.length === 0) {
+      await updateSpaRun(env.DB, run.id, {
+        status: "running",
         offset: nextOffset,
       });
-      return;
+      if (hasMore) {
+        await env.SPA_QUEUE.send({
+          type: "spa_page",
+          runId: run.id,
+          exchangeId: exchange.id,
+          offset: nextOffset,
+        });
+        return;
+      }
+    } else {
+      const call: SpaApiCall = {
+        at: nowIso(),
+        endpoint: isBinanceExchange(exchange.code)
+          ? "coingecko.tickers"
+          : "yahoo.screener",
+        // Symbol index for UI ranges (not the provider cursor).
+        pageOffset: run.scanned,
+        pageSize: run.page_size,
+        quoteCount: page.length,
+        upstreamRequests,
+        latencyMs: Date.now() - startedMs,
+        ok: true,
+      };
+
+      const quotes: SpaPricePoint[] = page.map((quote) => ({
+        s: quote.symbol,
+        p: quote.price,
+        ...(quote.volume != null ? { v: quote.volume } : {}),
+        ...(quote.name ? { n: quote.name } : {}),
+      }));
+
+      await insertSpaRunPage(env.DB, {
+        id: crypto.randomUUID(),
+        runId: run.id,
+        pageOffset: run.scanned,
+        quotes,
+        call,
+      });
+
+      calls = [...calls, call];
+      scanned = run.scanned + page.length;
+      pages = run.pages + 1;
+
+      await updateSpaRun(env.DB, run.id, {
+        status: "running",
+        offset: nextOffset,
+        scanned,
+        pages,
+        calls_json: JSON.stringify(calls),
+      });
+
+      await updateSpaExchange(env.DB, exchange.id, {
+        last_run_scanned: scanned,
+        last_run_status: "running",
+      });
+
+      if (hasMore) {
+        await env.SPA_QUEUE.send({
+          type: "spa_page",
+          runId: run.id,
+          exchangeId: exchange.id,
+          offset: nextOffset,
+        });
+        return;
+      }
     }
 
     // Final page — merge staging pages into one sample snapshot.

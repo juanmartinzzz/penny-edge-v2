@@ -170,14 +170,18 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
   }
 
   /**
-   * One CoinGecko Binance ticker page (volume desc), filtered by quote asset.
-   * `offset` is the 0-based CoinGecko page index — never re-walk earlier pages.
+   * CoinGecko Binance tickers (volume desc), filtered by quote asset.
+   *
+   * `offset` is the 0-based CoinGecko page index to resume from — never re-walk
+   * earlier pages. Fetches whole ticker pages until we have `limit` filtered
+   * quotes (or the exchange is exhausted). Each HTTP call is counted in
+   * `upstreamRequests`.
    */
   async screen(query: ScreenerQuery): Promise<ScreenResult> {
     this.requireKey();
 
-    const pageIndex = Math.max(0, query.offset ?? 0);
-    const cgPage = pageIndex + 1;
+    let pageIndex = Math.max(0, query.offset ?? 0);
+    const limit = Math.max(1, query.limit ?? COINGECKO_TICKERS_PAGE_SIZE);
     const quoteAssets = (
       query.quoteAssets?.length
         ? query.quoteAssets
@@ -193,32 +197,67 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
       };
     }
 
-    const tickers = await fetchCoinGeckoBinanceTickerPage(
-      this.coinGeckoDemoApiKey,
-      cgPage,
-      this.fetchOpts,
-    );
+    const collected: Quote[] = [];
+    let upstreamRequests = 0;
 
-    const quotes: Quote[] = [];
-    for (const ticker of tickers) {
-      const target = ticker.target?.trim().toUpperCase();
-      if (!target || !quoteSet.has(target)) continue;
+    while (pageIndex < COINGECKO_MAX_PAGES) {
+      const tickers = await fetchCoinGeckoBinanceTickerPage(
+        this.coinGeckoDemoApiKey,
+        pageIndex + 1,
+        this.fetchOpts,
+      );
+      upstreamRequests += 1;
 
-      const quote = mapCoinGeckoTickerToQuote(ticker);
-      if (!quote) continue;
-
-      if (ticker.coin_id && ticker.base) {
-        this.coinIdCache.set(ticker.base.trim().toUpperCase(), ticker.coin_id);
+      if (tickers.length === 0) {
+        return {
+          quotes: collected,
+          upstreamRequests,
+          hasMore: false,
+          nextOffset: pageIndex,
+        };
       }
-      quotes.push(quote);
+
+      for (const ticker of tickers) {
+        const target = ticker.target?.trim().toUpperCase();
+        if (!target || !quoteSet.has(target)) continue;
+
+        const quote = mapCoinGeckoTickerToQuote(ticker);
+        if (!quote) continue;
+
+        if (ticker.coin_id && ticker.base) {
+          this.coinIdCache.set(ticker.base.trim().toUpperCase(), ticker.coin_id);
+        }
+        collected.push(quote);
+      }
+
+      pageIndex += 1;
+      const pageFull = tickers.length >= COINGECKO_TICKERS_PAGE_SIZE;
+
+      // Consume whole CoinGecko pages so we never skip mid-page tickers.
+      if (collected.length >= limit) {
+        return {
+          quotes: collected,
+          upstreamRequests,
+          hasMore: pageFull,
+          nextOffset: pageIndex,
+        };
+      }
+
+      if (!pageFull) {
+        return {
+          quotes: collected,
+          upstreamRequests,
+          hasMore: false,
+          nextOffset: pageIndex,
+        };
+      }
     }
 
-    const hasMore = tickers.length >= COINGECKO_TICKERS_PAGE_SIZE;
     return {
-      quotes,
-      upstreamRequests: 1,
-      hasMore,
-      nextOffset: pageIndex + 1,
+      quotes: collected,
+      upstreamRequests,
+      hasMore: false,
+      nextOffset: pageIndex,
     };
   }
 
