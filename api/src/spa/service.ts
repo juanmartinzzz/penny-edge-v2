@@ -336,7 +336,12 @@ export async function processSpaJob(
       : undefined;
 
     const startedMs = Date.now();
-    const { quotes: page, upstreamRequests } = await market.screen({
+    const {
+      quotes: page,
+      upstreamRequests,
+      hasMore,
+      nextOffset,
+    } = await market.screen({
       exchange: exchange.code,
       offset: message.offset,
       limit: run.page_size,
@@ -348,7 +353,8 @@ export async function processSpaJob(
       endpoint: isBinanceExchange(exchange.code)
         ? "coingecko.tickers"
         : "yahoo.screener",
-      pageOffset: message.offset,
+      // Symbol index for UI ranges (not the provider cursor).
+      pageOffset: run.scanned,
       pageSize: run.page_size,
       quoteCount: page.length,
       upstreamRequests,
@@ -366,7 +372,7 @@ export async function processSpaJob(
     await insertSpaRunPage(env.DB, {
       id: crypto.randomUUID(),
       runId: run.id,
-      pageOffset: message.offset,
+      pageOffset: run.scanned,
       quotes,
       call,
     });
@@ -374,8 +380,6 @@ export async function processSpaJob(
     const calls = [...parseCallsJson(run.calls_json), call];
     const scanned = run.scanned + page.length;
     const pages = run.pages + 1;
-    const hasMore = page.length >= run.page_size;
-    const nextOffset = message.offset + run.page_size;
 
     await updateSpaRun(env.DB, run.id, {
       status: "running",

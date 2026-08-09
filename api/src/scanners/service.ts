@@ -312,7 +312,11 @@ export async function processScannerJob(
     const quoteAssets = isBinanceExchange(scanner.code)
       ? parseEnabledQuoteAssets(scanner.enabled_quote_assets)
       : undefined;
-    const { quotes: page } = await market.screen({
+    const {
+      quotes: page,
+      hasMore,
+      nextOffset,
+    } = await market.screen({
       exchange: scanner.code,
       offset: message.offset,
       limit: run.page_size,
@@ -367,8 +371,6 @@ export async function processScannerJob(
 
     const scanned = run.scanned + page.length;
     const matched = run.matched + matchedQuotes.length;
-    const hasMore = page.length >= run.page_size;
-    const nextOffset = message.offset + run.page_size;
 
     await updateRun(env.DB, run.id, {
       status: "running",

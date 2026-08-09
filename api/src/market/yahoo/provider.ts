@@ -171,7 +171,12 @@ export class YahooMarketDataProvider implements MarketDataProvider {
     });
 
     // One screener POST per screen() window (auth refresh is separate if needed).
-    return { quotes, upstreamRequests: 1 };
+    return {
+      quotes,
+      upstreamRequests: 1,
+      hasMore: quotes.length >= limit,
+      nextOffset: offset + limit,
+    };
   }
 
   private async withAuthRetry<T>(

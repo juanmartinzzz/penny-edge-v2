@@ -52,6 +52,11 @@ export interface ChartResult {
 
 export interface ScreenerQuery {
   exchange: Exchange;
+  /**
+   * Pagination cursor.
+   * Yahoo: screener `offset` (0, 200, 400, …).
+   * Binance/CoinGecko: 0-based `/exchanges/.../tickers` page index (0 → page 1).
+   */
   offset?: number;
   limit?: number;
   /** Binance: only pairs whose quoteAsset is in this list (e.g. ["USDT"]). */
@@ -63,6 +68,13 @@ export interface ScreenResult {
   quotes: Quote[];
   /** Actual Yahoo / CoinGecko HTTP requests made for this screen() call. */
   upstreamRequests: number;
+  /** Provider still has another page after this window. */
+  hasMore: boolean;
+  /**
+   * Cursor to pass as the next `offset`.
+   * Yahoo: screener offset. CoinGecko/Binance: 0-based ticker page index.
+   */
+  nextOffset: number;
 }
 
 export interface ProviderAuthStatus {

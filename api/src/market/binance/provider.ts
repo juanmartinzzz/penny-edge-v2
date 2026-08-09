@@ -170,67 +170,56 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
   }
 
   /**
-   * Paginate CoinGecko Binance tickers (volume desc), filter by quote asset,
-   * return EVG offset/limit window as Quotes with dailyQuoteNotional.
+   * One CoinGecko Binance ticker page (volume desc), filtered by quote asset.
+   * `offset` is the 0-based CoinGecko page index — never re-walk earlier pages.
    */
   async screen(query: ScreenerQuery): Promise<ScreenResult> {
     this.requireKey();
 
-    const offset = query.offset ?? 0;
-    // Cap at CoinGecko's hard max per HTTP page — never reuse Yahoo's limit.
-    // screen() still walks CoinGecko pages of 100 raw tickers until this many
-    // quote-filtered results are collected (or the exchange is exhausted).
-    const requested = query.limit ?? COINGECKO_TICKERS_PAGE_SIZE;
-    const limit = Math.min(Math.max(requested, 0), COINGECKO_TICKERS_PAGE_SIZE);
+    const pageIndex = Math.max(0, query.offset ?? 0);
+    const cgPage = pageIndex + 1;
     const quoteAssets = (
       query.quoteAssets?.length
         ? query.quoteAssets
         : DEFAULT_BINANCE_QUOTE_ASSETS
     ).map((asset) => asset.toUpperCase());
     const quoteSet = new Set(quoteAssets);
-    if (quoteSet.size === 0 || limit <= 0) {
-      return { quotes: [], upstreamRequests: 0 };
+    if (quoteSet.size === 0) {
+      return {
+        quotes: [],
+        upstreamRequests: 0,
+        hasMore: false,
+        nextOffset: pageIndex,
+      };
     }
 
-    const collected: Quote[] = [];
-    let skipped = 0;
-    let upstreamRequests = 0;
+    const tickers = await fetchCoinGeckoBinanceTickerPage(
+      this.coinGeckoDemoApiKey,
+      cgPage,
+      this.fetchOpts,
+    );
 
-    for (let page = 1; page <= COINGECKO_MAX_PAGES; page++) {
-      const tickers = await fetchCoinGeckoBinanceTickerPage(
-        this.coinGeckoDemoApiKey,
-        page,
-        this.fetchOpts,
-      );
-      upstreamRequests += 1;
-      if (tickers.length === 0) break;
+    const quotes: Quote[] = [];
+    for (const ticker of tickers) {
+      const target = ticker.target?.trim().toUpperCase();
+      if (!target || !quoteSet.has(target)) continue;
 
-      for (const ticker of tickers) {
-        const target = ticker.target?.trim().toUpperCase();
-        if (!target || !quoteSet.has(target)) continue;
+      const quote = mapCoinGeckoTickerToQuote(ticker);
+      if (!quote) continue;
 
-        const quote = mapCoinGeckoTickerToQuote(ticker);
-        if (!quote) continue;
-
-        if (ticker.coin_id && ticker.base) {
-          this.coinIdCache.set(ticker.base.trim().toUpperCase(), ticker.coin_id);
-        }
-
-        if (skipped < offset) {
-          skipped += 1;
-          continue;
-        }
-
-        collected.push(quote);
-        if (collected.length >= limit) {
-          return { quotes: collected, upstreamRequests };
-        }
+      if (ticker.coin_id && ticker.base) {
+        this.coinIdCache.set(ticker.base.trim().toUpperCase(), ticker.coin_id);
       }
-
-      if (tickers.length < COINGECKO_TICKERS_PAGE_SIZE) break;
+      quotes.push(quote);
     }
 
-    return { quotes: collected, upstreamRequests };
+    const hasMore = tickers.length >= COINGECKO_TICKERS_PAGE_SIZE;
+    return {
+      quotes,
+      upstreamRequests: 1,
+      hasMore,
+      nextOffset: pageIndex + 1,
+    };
   }
 
   private requireKey(): void {
