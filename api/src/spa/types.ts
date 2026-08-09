@@ -12,6 +12,10 @@ export interface SpaExchangeRow {
   interval_minutes: number;
   retention_days: number;
   enabled_quote_assets: string | null;
+  timezone: string;
+  open_local: string;
+  close_local: string;
+  include_weekends: number;
   last_run_at: string | null;
   next_run_at: string | null;
   last_run_status: string | null;

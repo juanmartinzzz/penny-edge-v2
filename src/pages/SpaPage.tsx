@@ -18,6 +18,7 @@ import {
   DEFAULT_BINANCE_QUOTE_ASSETS,
   isBinanceExchange,
 } from "../lib/binance";
+import { isExchangeSessionOpen } from "../lib/exchangeHours";
 import { PRODUCT_NAMES } from "../lib/productNames";
 import { formatDateTime } from "../lib/dates";
 import { formatAdaptiveNumber } from "../lib/formatNumber";
@@ -42,12 +43,21 @@ type SpaDraft = {
   intervalMinutes: string;
   retentionDays: string;
   enabledQuoteAssets: string[];
+  timezone: string;
+  openLocal: string;
+  closeLocal: string;
+  includeWeekends: boolean;
 };
 
 const QUOTE_ASSET_OPTIONS = BINANCE_QUOTE_ASSET_OPTIONS.map((asset) => ({
   value: asset,
   label: asset,
 }));
+
+const WEEKEND_OPTIONS = [
+  { value: "weekdays", label: "Weekdays only" },
+  { value: "weekends", label: "Include weekends" },
+];
 
 function draftFromExchange(exchange: SpaExchange): SpaDraft {
   return {
@@ -56,6 +66,10 @@ function draftFromExchange(exchange: SpaExchange): SpaDraft {
     enabledQuoteAssets: exchange.enabledQuoteAssets?.length
       ? [...exchange.enabledQuoteAssets]
       : [...DEFAULT_BINANCE_QUOTE_ASSETS],
+    timezone: exchange.timezone,
+    openLocal: exchange.openLocal,
+    closeLocal: exchange.closeLocal,
+    includeWeekends: exchange.includeWeekends,
   };
 }
 
@@ -66,6 +80,10 @@ function draftMatches(exchange: SpaExchange, draft: SpaDraft): boolean {
   if (String(exchange.retentionDays) !== draft.retentionDays.trim()) {
     return false;
   }
+  if (exchange.timezone !== draft.timezone.trim()) return false;
+  if (exchange.openLocal !== draft.openLocal.trim()) return false;
+  if (exchange.closeLocal !== draft.closeLocal.trim()) return false;
+  if (exchange.includeWeekends !== draft.includeWeekends) return false;
   if (isBinanceExchange(exchange.code)) {
     const a = [...(exchange.enabledQuoteAssets ?? [])].sort().join(",");
     const b = [...draft.enabledQuoteAssets].sort().join(",");
@@ -357,6 +375,10 @@ export function SpaPage() {
       const body: Parameters<typeof updateSpaExchange>[1] = {
         intervalMinutes: Math.floor(intervalMinutes),
         retentionDays: Math.floor(retentionDays),
+        timezone: draft.timezone.trim(),
+        openLocal: draft.openLocal.trim(),
+        closeLocal: draft.closeLocal.trim(),
+        includeWeekends: draft.includeWeekends,
       };
       if (isBinanceExchange(exchange.code)) {
         body.enabledQuoteAssets = draft.enabledQuoteAssets;
@@ -424,7 +446,7 @@ export function SpaPage() {
   function sectionsFor(
     exchange: SpaExchange,
     draft: SpaDraft,
-    opts: { running: boolean; settingsDirty: boolean },
+    opts: { running: boolean; settingsDirty: boolean; sessionOpen: boolean },
   ): SectionsCardSection[] {
     const binance = isBinanceExchange(exchange.code);
     const scheduleStatus = exchange.enabled
@@ -439,9 +461,9 @@ export function SpaPage() {
         columns: [
           <div key="status" className="spa-status-row">
             <span
-              className={`spa-pill${exchange.sessionOpen ? " is-market-open" : ""}`}
+              className={`spa-pill${opts.sessionOpen ? " is-market-open" : ""}`}
             >
-              {exchange.sessionOpen ? "Market open" : "Market closed"}
+              {opts.sessionOpen ? "Market open" : "Market closed"}
             </span>
             <span className={`spa-pill${opts.running ? " is-running" : ""}`}>
               {exchange.sampleCount} samples
@@ -456,7 +478,7 @@ export function SpaPage() {
         id: "schedule",
         title: "Sampling",
         description:
-          "Exchange-wide last-price snapshots. Session hours follow EVG settings.",
+          "Exchange-wide last-price snapshots on SPA’s own interval and hours.",
         columns: [
           <NumericInput
             key="interval"
@@ -484,6 +506,83 @@ export function SpaPage() {
           />,
         ],
       },
+      {
+        id: "hours",
+        title: "Open hours",
+        description:
+          "Cron skips sampling outside open→close. Use 00:00–24:00 for all day; include weekends when needed. Manual Run still works.",
+        columns: [
+          <label
+            key="timezone"
+            className="numeric-input"
+            htmlFor={`spa-tz-${exchange.id}`}
+          >
+            <span className="numeric-input-label">Timezone</span>
+            <input
+              id={`spa-tz-${exchange.id}`}
+              type="text"
+              value={draft.timezone}
+              onChange={(event) =>
+                patchDraft(exchange.id, draft, {
+                  timezone: event.target.value,
+                })
+              }
+              placeholder="America/New_York"
+            />
+          </label>,
+          <label
+            key="open"
+            className="numeric-input"
+            htmlFor={`spa-open-${exchange.id}`}
+          >
+            <span className="numeric-input-label">Open (local HH:MM)</span>
+            <input
+              id={`spa-open-${exchange.id}`}
+              type="text"
+              inputMode="numeric"
+              placeholder="09:30"
+              value={draft.openLocal}
+              onChange={(event) =>
+                patchDraft(exchange.id, draft, {
+                  openLocal: event.target.value,
+                })
+              }
+            />
+          </label>,
+          <label
+            key="close"
+            className="numeric-input"
+            htmlFor={`spa-close-${exchange.id}`}
+          >
+            <span className="numeric-input-label">
+              Close (local HH:MM or 24:00)
+            </span>
+            <input
+              id={`spa-close-${exchange.id}`}
+              type="text"
+              inputMode="numeric"
+              placeholder="16:00"
+              value={draft.closeLocal}
+              onChange={(event) =>
+                patchDraft(exchange.id, draft, {
+                  closeLocal: event.target.value,
+                })
+              }
+            />
+          </label>,
+          <PillSelect
+            key="weekends"
+            label="Weekend trading"
+            options={WEEKEND_OPTIONS}
+            value={draft.includeWeekends ? "weekends" : "weekdays"}
+            onChange={(value) =>
+              patchDraft(exchange.id, draft, {
+                includeWeekends: value === "weekends",
+              })
+            }
+          />,
+        ],
+      },
     ];
 
     if (binance) {
@@ -491,7 +590,7 @@ export function SpaPage() {
         id: "quotes",
         title: "Quote markets",
         description:
-          "Only pairs priced in these quote assets are archived (same idea as EVG).",
+          "Only pairs priced in these quote assets are archived.",
         columns: [
           <PillSelect
             key="quoteAssets"
@@ -620,8 +719,8 @@ export function SpaPage() {
         <p>
           Append-only exchange-wide price archive. Samples last prices on a
           per-venue interval (default 20 minutes), stores one snapshot per call
-          cycle, and keeps them for the retention window. Session gates reuse
-          EVG open hours.
+          cycle, and keeps them for the retention window. Each venue has its own
+          open hours — independent of EVG.
         </p>
       </header>
 
@@ -637,6 +736,12 @@ export function SpaPage() {
             exchange.activeRun?.status === "queued" ||
             exchange.activeRun?.status === "running";
           const settingsDirty = !draftMatches(exchange, draft);
+          const sessionOpen = isExchangeSessionOpen({
+            timezone: draft.timezone,
+            openLocal: draft.openLocal,
+            closeLocal: draft.closeLocal,
+            includeWeekends: draft.includeWeekends,
+          });
 
           return (
             <SectionsCard
@@ -669,6 +774,7 @@ export function SpaPage() {
               sections={sectionsFor(exchange, draft, {
                 running,
                 settingsDirty,
+                sessionOpen,
               })}
             />
           );

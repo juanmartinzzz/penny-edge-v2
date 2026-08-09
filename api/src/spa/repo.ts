@@ -49,6 +49,10 @@ export async function updateSpaExchange(
     interval_minutes?: number;
     retention_days?: number;
     enabled_quote_assets?: string | null;
+    timezone?: string;
+    open_local?: string;
+    close_local?: string;
+    include_weekends?: number;
     next_run_at?: string | null;
     last_run_at?: string | null;
     last_run_status?: string | null;
@@ -68,6 +72,10 @@ export async function updateSpaExchange(
          interval_minutes = ?,
          retention_days = ?,
          enabled_quote_assets = ?,
+         timezone = ?,
+         open_local = ?,
+         close_local = ?,
+         include_weekends = ?,
          next_run_at = ?,
          last_run_at = ?,
          last_run_status = ?,
@@ -84,6 +92,12 @@ export async function updateSpaExchange(
       patch.enabled_quote_assets !== undefined
         ? patch.enabled_quote_assets
         : current.enabled_quote_assets,
+      patch.timezone ?? current.timezone,
+      patch.open_local ?? current.open_local,
+      patch.close_local ?? current.close_local,
+      patch.include_weekends !== undefined
+        ? patch.include_weekends
+        : current.include_weekends,
       patch.next_run_at !== undefined ? patch.next_run_at : current.next_run_at,
       patch.last_run_at !== undefined ? patch.last_run_at : current.last_run_at,
       patch.last_run_status !== undefined

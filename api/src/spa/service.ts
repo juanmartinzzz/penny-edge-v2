@@ -4,7 +4,10 @@
  */
 import {
   isExchangeSessionOpen,
-  type ExchangeSession,
+  isValidCloseHhmm,
+  isValidOpenHhmm,
+  parseHhmmToMinutes,
+  sessionFromRow,
 } from "../../../shared/exchangeHours";
 import { createMarketDataService, type MarketEnv } from "../market/service";
 import {
@@ -12,7 +15,6 @@ import {
   parseEnabledQuoteAssets,
   serializeEnabledQuoteAssets,
 } from "../market/binance/constants";
-import { listExchangeSessions } from "../scanners/repo";
 import {
   countSpaSamples,
   createSpaRun,
@@ -52,24 +54,8 @@ function pageSize(env: SpaEnv): number {
   return Math.min(Math.max(Number(env.SPA_PAGE_SIZE ?? "200") || 200, 25), 250);
 }
 
-async function sessionForCode(
-  env: SpaEnv,
-  code: string,
-): Promise<ExchangeSession | null> {
-  const sessions = await listExchangeSessions(env.DB);
-  const row = sessions.get(code);
-  if (!row) return null;
-  return {
-    timezone: row.timezone,
-    openLocal: row.openLocal,
-    closeLocal: row.closeLocal,
-    includeWeekends: row.includeWeekends,
-  };
-}
-
 export async function getSpaOverview(env: SpaEnv) {
   const exchanges = await listSpaExchanges(env.DB);
-  const sessions = await listExchangeSessions(env.DB);
   const items = [];
 
   for (const exchange of exchanges) {
@@ -80,7 +66,7 @@ export async function getSpaOverview(env: SpaEnv) {
     ]);
 
     items.push({
-      ...serializeExchange(exchange, sessions.get(exchange.code) ?? null),
+      ...serializeExchange(exchange),
       sampleCount,
       activeRun: activeRun ? serializeRun(activeRun) : null,
       recentSamples: recentSamples.map((s) => serializeSampleMeta(s)),
@@ -94,7 +80,6 @@ export async function getSpaDetail(env: SpaEnv, exchangeId: string) {
   const exchange = await getSpaExchange(env.DB, exchangeId);
   if (!exchange) return null;
 
-  const sessions = await listExchangeSessions(env.DB);
   const [sampleCount, activeRun, recentSamples] = await Promise.all([
     countSpaSamples(env.DB, exchange.id),
     getActiveSpaRun(env.DB, exchange.id),
@@ -102,7 +87,7 @@ export async function getSpaDetail(env: SpaEnv, exchangeId: string) {
   ]);
 
   return {
-    ...serializeExchange(exchange, sessions.get(exchange.code) ?? null),
+    ...serializeExchange(exchange),
     sampleCount,
     activeRun: activeRun ? serializeRun(activeRun) : null,
     recentSamples: recentSamples.map((s) => serializeSampleMeta(s)),
@@ -117,6 +102,10 @@ export async function patchSpaExchange(
     intervalMinutes?: number;
     retentionDays?: number;
     enabledQuoteAssets?: string[];
+    timezone?: string;
+    openLocal?: string;
+    closeLocal?: string;
+    includeWeekends?: boolean;
   },
 ) {
   const exchange = await getSpaExchange(env.DB, exchangeId);
@@ -163,6 +152,44 @@ export async function patchSpaExchange(
     patch.enabled_quote_assets = serializeEnabledQuoteAssets(normalized);
   }
 
+  if (body.timezone !== undefined) {
+    const timezone = body.timezone.trim();
+    if (!timezone) throw new Error("timezone is required");
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: timezone });
+    } catch {
+      throw new Error("timezone must be a valid IANA timezone");
+    }
+    patch.timezone = timezone;
+  }
+
+  if (body.openLocal !== undefined) {
+    if (!isValidOpenHhmm(body.openLocal)) {
+      throw new Error("openLocal must be HH:MM (00:00–23:59)");
+    }
+    patch.open_local = body.openLocal.trim();
+  }
+
+  if (body.closeLocal !== undefined) {
+    if (!isValidCloseHhmm(body.closeLocal)) {
+      throw new Error("closeLocal must be HH:MM (00:00–23:59 or 24:00)");
+    }
+    patch.close_local = body.closeLocal.trim();
+  }
+
+  const nextOpen = patch.open_local ?? exchange.open_local;
+  const nextClose = patch.close_local ?? exchange.close_local;
+  if (
+    (body.openLocal !== undefined || body.closeLocal !== undefined) &&
+    (parseHhmmToMinutes(nextOpen) ?? 0) >= (parseHhmmToMinutes(nextClose) ?? 0)
+  ) {
+    throw new Error("openLocal must be before closeLocal");
+  }
+
+  if (body.includeWeekends !== undefined) {
+    patch.include_weekends = body.includeWeekends ? 1 : 0;
+  }
+
   if (body.enabled !== undefined) {
     const enabling = body.enabled && exchange.enabled === 0;
     const disabling = !body.enabled && exchange.enabled === 1;
@@ -181,7 +208,6 @@ export async function patchSpaExchange(
   const updated = await updateSpaExchange(env.DB, exchangeId, patch);
   if (!updated) return null;
 
-  const sessions = await listExchangeSessions(env.DB);
   const [sampleCount, activeRun, recentSamples] = await Promise.all([
     countSpaSamples(env.DB, updated.id),
     getActiveSpaRun(env.DB, updated.id),
@@ -189,7 +215,7 @@ export async function patchSpaExchange(
   ]);
 
   return {
-    ...serializeExchange(updated, sessions.get(updated.code) ?? null),
+    ...serializeExchange(updated),
     sampleCount,
     activeRun: activeRun ? serializeRun(activeRun) : null,
     recentSamples: recentSamples.map((s) => serializeSampleMeta(s)),
@@ -235,15 +261,14 @@ export async function startSpaRun(
   return serializeRun(run);
 }
 
-/** Cron: start due enabled SPA venues whose EVG session is open. */
+/** Cron: start due enabled SPA venues whose own session is open. */
 export async function processDueSpa(env: SpaEnv): Promise<number> {
   const due = await listDueSpaExchanges(env.DB, nowIso());
   let started = 0;
   const now = new Date();
 
   for (const exchange of due) {
-    const session = await sessionForCode(env, exchange.code);
-    if (session && !isExchangeSessionOpen(session, now)) {
+    if (!isExchangeSessionOpen(sessionFromRow(exchange), now)) {
       continue;
     }
 
@@ -470,22 +495,9 @@ export async function getSpaSampleDetail(env: SpaEnv, sampleId: string) {
 
 function serializeExchange(
   exchange: NonNullable<Awaited<ReturnType<typeof getSpaExchange>>>,
-  session: {
-    timezone: string;
-    openLocal: string;
-    closeLocal: string;
-    includeWeekends: boolean;
-  } | null,
 ) {
   const binance = isBinanceExchange(exchange.code);
-  const sessionOpen = session
-    ? isExchangeSessionOpen({
-        timezone: session.timezone,
-        openLocal: session.openLocal,
-        closeLocal: session.closeLocal,
-        includeWeekends: session.includeWeekends,
-      })
-    : false;
+  const session = sessionFromRow(exchange);
 
   return {
     id: exchange.id,
@@ -497,11 +509,11 @@ function serializeExchange(
     enabledQuoteAssets: binance
       ? parseEnabledQuoteAssets(exchange.enabled_quote_assets)
       : null,
-    sessionOpen,
-    timezone: session?.timezone ?? null,
-    openLocal: session?.openLocal ?? null,
-    closeLocal: session?.closeLocal ?? null,
-    includeWeekends: session?.includeWeekends ?? false,
+    sessionOpen: isExchangeSessionOpen(session),
+    timezone: exchange.timezone,
+    openLocal: exchange.open_local,
+    closeLocal: exchange.close_local,
+    includeWeekends: Boolean(exchange.include_weekends),
     lastRunAt: exchange.last_run_at,
     nextRunAt: exchange.next_run_at,
     lastRunStatus: exchange.last_run_status,

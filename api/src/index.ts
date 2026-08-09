@@ -572,6 +572,10 @@ app.patch("/spa/:id", async (c) => {
       intervalMinutes?: number;
       retentionDays?: number;
       enabledQuoteAssets?: string[];
+      timezone?: string;
+      openLocal?: string;
+      closeLocal?: string;
+      includeWeekends?: boolean;
     }>();
     const exchange = await patchSpaExchange(c.env, c.req.param("id"), body);
     if (!exchange) return c.json({ error: "SPA exchange not found" }, 404);

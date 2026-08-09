@@ -72,9 +72,9 @@ export type SpaExchange = {
   retentionDays: number;
   enabledQuoteAssets: string[] | null;
   sessionOpen: boolean;
-  timezone: string | null;
-  openLocal: string | null;
-  closeLocal: string | null;
+  timezone: string;
+  openLocal: string;
+  closeLocal: string;
   includeWeekends: boolean;
   lastRunAt: string | null;
   nextRunAt: string | null;
@@ -103,6 +103,10 @@ export function updateSpaExchange(
     intervalMinutes?: number;
     retentionDays?: number;
     enabledQuoteAssets?: string[];
+    timezone?: string;
+    openLocal?: string;
+    closeLocal?: string;
+    includeWeekends?: boolean;
   },
 ) {
   return apiFetch<{ exchange: SpaExchange }>(`/spa/${id}`, {
