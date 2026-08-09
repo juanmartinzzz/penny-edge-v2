@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Lightbulb, Plus, Save, Trash2, X } from "lucide-react";
+import { ChevronDown, Lightbulb, Plus, Save, Trash2 } from "lucide-react";
 import { Button } from "../components/interaction/Button";
 import { PillSelect } from "../components/interaction/PillSelect";
+import {
+  SectionsCard,
+  type SectionsCardSection,
+} from "../components/interaction/SectionsCard";
 import {
   createFutureFeature,
   deleteFutureFeature,
@@ -34,6 +38,7 @@ type Draft = {
 };
 
 type FeatureEditorProps = {
+  cardId: string;
   title: string;
   draft: Draft;
   busy: boolean;
@@ -121,6 +126,7 @@ function bodyParagraphs(body: string): string[] {
 }
 
 function FeatureEditor({
+  cardId,
   title,
   draft,
   busy,
@@ -130,65 +136,78 @@ function FeatureEditor({
   onSave,
   onCancel,
 }: FeatureEditorProps) {
-  return (
-    <div className="ff-editor">
-      <div className="ff-editor-top">
-        <strong>{title}</strong>
-        <Button variant="ghost" iconOnly aria-label="Cancel edit" onClick={onCancel}>
-          <X size={16} />
-        </Button>
-      </div>
+  const basicsColumns = [
+    <label key="title" className="ff-field">
+      <span>Title</span>
+      <input
+        value={draft.title}
+        onChange={(e) => onDraftChange((d) => ({ ...d, title: e.target.value }))}
+        placeholder="Short name"
+      />
+    </label>,
+    <div key="type" className="ff-field">
+      <PillSelect
+        label="Type"
+        options={typePillOptions}
+        value={draft.typeSelect}
+        onChange={(typeSelect) => onDraftChange((d) => ({ ...d, typeSelect }))}
+      />
+    </div>,
+    <div key="status" className="ff-field">
+      <PillSelect
+        label="Status"
+        options={statusPillOptions}
+        value={draft.status}
+        onChange={(status) =>
+          onDraftChange((d) => ({
+            ...d,
+            status: status as FutureFeatureStatus,
+          }))
+        }
+      />
+    </div>,
+    <label key="tags" className="ff-field">
+      <span>Tags</span>
+      <input
+        value={draft.tags}
+        onChange={(e) => onDraftChange((d) => ({ ...d, tags: e.target.value }))}
+        placeholder="Comma-separated"
+      />
+    </label>,
+  ];
 
-      <div className="ff-editor-grid">
-        <label className="ff-field ff-field-span-2">
-          <span>Title</span>
-          <input
-            value={draft.title}
-            onChange={(e) =>
-              onDraftChange((d) => ({ ...d, title: e.target.value }))
-            }
-            placeholder="Short name"
-          />
-        </label>
+  if (draft.typeSelect === CUSTOM_TYPE_VALUE) {
+    basicsColumns.splice(
+      2,
+      0,
+      <label key="custom-type" className="ff-field">
+        <span>Custom type</span>
+        <input
+          value={draft.customType}
+          autoFocus
+          placeholder="e.g. replayability"
+          onChange={(e) =>
+            onDraftChange((d) => ({ ...d, customType: e.target.value }))
+          }
+        />
+      </label>,
+    );
+  }
 
-        <div className="ff-field ff-field-span-2">
-          <PillSelect
-            label="Type"
-            options={typePillOptions}
-            value={draft.typeSelect}
-            onChange={(typeSelect) => onDraftChange((d) => ({ ...d, typeSelect }))}
-          />
-        </div>
-
-        {draft.typeSelect === CUSTOM_TYPE_VALUE ? (
-          <label className="ff-field ff-field-span-2">
-            <span>Custom type</span>
-            <input
-              value={draft.customType}
-              autoFocus
-              placeholder="e.g. replayability"
-              onChange={(e) =>
-                onDraftChange((d) => ({ ...d, customType: e.target.value }))
-              }
-            />
-          </label>
-        ) : null}
-
-        <div className="ff-field ff-field-span-2">
-          <PillSelect
-            label="Status"
-            options={statusPillOptions}
-            value={draft.status}
-            onChange={(status) =>
-              onDraftChange((d) => ({
-                ...d,
-                status: status as FutureFeatureStatus,
-              }))
-            }
-          />
-        </div>
-
-        <label className="ff-field ff-field-span-2">
+  const sections: SectionsCardSection[] = [
+    {
+      id: "basics",
+      title: "Basics",
+      description: "Name, capability type, backlog status, and tags.",
+      columns: basicsColumns,
+    },
+    {
+      id: "content",
+      title: "Content",
+      description:
+        "Body cards: blank line between ideas. Short lines bold · - bullets · 1) big numbers.",
+      columns: [
+        <label key="body" className="ff-field">
           <span>Body</span>
           <textarea
             rows={5}
@@ -198,20 +217,15 @@ function FeatureEditor({
             }
             placeholder="Cards: blank line between ideas. Short lines bold · - bullets · 1) big numbers…"
           />
-        </label>
-
-        <label className="ff-field ff-field-span-2">
-          <span>Tags</span>
-          <input
-            value={draft.tags}
-            onChange={(e) =>
-              onDraftChange((d) => ({ ...d, tags: e.target.value }))
-            }
-            placeholder="Comma-separated"
-          />
-        </label>
-
-        <label className="ff-field ff-field-span-2">
+        </label>,
+      ],
+    },
+    {
+      id: "execution",
+      title: "Execution",
+      description: "Notes for later and optional structured payload.",
+      columns: [
+        <label key="notes" className="ff-field">
           <span>Execution notes</span>
           <textarea
             rows={3}
@@ -221,9 +235,8 @@ function FeatureEditor({
             }
             placeholder="Same card formatting as body: short lines, - bullets, 1) numbers…"
           />
-        </label>
-
-        <label className="ff-field ff-field-span-2">
+        </label>,
+        <label key="payload" className="ff-field">
           <span>Payload JSON</span>
           <textarea
             rows={4}
@@ -234,19 +247,28 @@ function FeatureEditor({
             }
             placeholder='{"area":"api","hint":"…"}'
           />
-        </label>
-      </div>
+        </label>,
+      ],
+    },
+  ];
 
-      <div className="ff-editor-actions">
-        <Button onClick={onSave} disabled={busy}>
-          <Save size={16} strokeWidth={2.5} />
-          {busy ? "Saving…" : "Save"}
-        </Button>
-        <Button variant="ghost" onClick={onCancel} disabled={busy}>
-          Cancel
-        </Button>
-      </div>
-    </div>
+  return (
+    <SectionsCard
+      id={cardId}
+      title={title}
+      sections={sections}
+      footer={
+        <>
+          <Button onClick={onSave} disabled={busy}>
+            <Save size={16} strokeWidth={2.5} />
+            {busy ? "Saving…" : "Save"}
+          </Button>
+          <Button variant="ghost" onClick={onCancel} disabled={busy}>
+            Cancel
+          </Button>
+        </>
+      }
+    />
   );
 }
 
@@ -264,6 +286,10 @@ export function FutureFeaturesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
+  /** Explicit expand/collapse; missing key → done collapsed, everything else expanded. */
+  const [expandOverrides, setExpandOverrides] = useState<Record<string, boolean>>(
+    {},
+  );
 
   async function reload(filters?: { status?: string; type?: string; q?: string }) {
     const [listRes, typesRes] = await Promise.all([
@@ -356,6 +382,14 @@ export function FutureFeaturesPage() {
     setDraft(emptyDraft());
   }
 
+  function toggleExpanded(id: string, currentlyExpanded: boolean) {
+    setExpandOverrides((prev) => ({ ...prev, [id]: !currentlyExpanded }));
+  }
+
+  function isFeatureExpanded(feature: FutureFeature): boolean {
+    return expandOverrides[feature.id] ?? feature.status !== "done";
+  }
+
   async function handleSave() {
     setBusy(true);
     setError(null);
@@ -385,19 +419,6 @@ export function FutureFeaturesPage() {
       await reload({ status: statusFilter, type: typeFilter, q: query.trim() });
     } catch (err) {
       reportUiError(setError, err, "Failed to delete", "FutureFeatures");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleQuickStatus(feature: FutureFeature, status: FutureFeatureStatus) {
-    setBusy(true);
-    setError(null);
-    try {
-      await updateFutureFeature(feature.id, { status });
-      await reload({ status: statusFilter, type: typeFilter, q: query.trim() });
-    } catch (err) {
-      reportUiError(setError, err, "Failed to update status", "FutureFeatures");
     } finally {
       setBusy(false);
     }
@@ -482,6 +503,7 @@ export function FutureFeaturesPage() {
           {creating ? (
             <li className="ff-item is-editing">
               <FeatureEditor
+                cardId="future-feature.editor.new"
                 title="New feature"
                 draft={draft}
                 busy={busy}
@@ -496,12 +518,14 @@ export function FutureFeaturesPage() {
 
           {orderedFeatures.map((feature) => {
             const active = editingId === feature.id;
-            const collapsed = feature.status === "done";
+            const expanded = isFeatureExpanded(feature);
+            const collapsed = !expanded;
 
             if (active) {
               return (
                 <li key={feature.id} className="ff-item is-editing">
                   <FeatureEditor
+                    cardId={`future-feature.editor.${feature.id}`}
                     title="Edit feature"
                     draft={draft}
                     busy={busy}
@@ -550,30 +574,6 @@ export function FutureFeaturesPage() {
                       Edit
                     </Button>
                   </span>
-                  {feature.status !== "ready" ? (
-                    <span className="ff-topline-cell">
-                      <Button
-                        variant="ghost"
-                        className="ff-topline-btn"
-                        disabled={busy || creating}
-                        onClick={() => handleQuickStatus(feature, "ready")}
-                      >
-                        Ready
-                      </Button>
-                    </span>
-                  ) : null}
-                  {feature.status !== "done" ? (
-                    <span className="ff-topline-cell">
-                      <Button
-                        variant="ghost"
-                        className="ff-topline-btn"
-                        disabled={busy || creating}
-                        onClick={() => handleQuickStatus(feature, "done")}
-                      >
-                        Done
-                      </Button>
-                    </span>
-                  ) : null}
                   <span className="ff-topline-cell">
                     <Button
                       variant="plain"
@@ -593,9 +593,16 @@ export function FutureFeaturesPage() {
                   <button
                     type="button"
                     className="ff-item-header"
-                    onClick={() => openEdit(feature)}
+                    aria-expanded={expanded}
+                    onClick={() => toggleExpanded(feature.id, expanded)}
                   >
                     <div className="ff-item-title-row">
+                      <ChevronDown
+                        size={16}
+                        strokeWidth={2.25}
+                        className={`ff-expand-chevron${collapsed ? " is-collapsed" : ""}`}
+                        aria-hidden
+                      />
                       <strong>{feature.title}</strong>
                     </div>
                   </button>
@@ -656,7 +663,9 @@ export function FutureFeaturesPage() {
                       feature.tags.length === 0 &&
                       !feature.executionNotes &&
                       !feature.payloadJson ? (
-                        <p className="ff-detail-empty">No details yet — click to edit.</p>
+                        <p className="ff-detail-empty">
+                          No details yet — use Edit to add some.
+                        </p>
                       ) : null}
                     </div>
                   ) : null}
