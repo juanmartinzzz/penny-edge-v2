@@ -378,6 +378,7 @@
 .ff-pill {
   display: inline-flex;
   align-items: center;
+  gap: 0.28rem;
   padding: 0.15rem 0.45rem;
   border-radius: var(--radius-full);
   font-size: 0.72rem;

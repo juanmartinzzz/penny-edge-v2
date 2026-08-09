@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ChevronDown, Lightbulb, Plus, Save, Trash2 } from "lucide-react";
+import {
+  BadgeCheck,
+  Ban,
+  ChevronDown,
+  CircleCheck,
+  CirclePause,
+  Lightbulb,
+  LoaderCircle,
+  Plus,
+  Save,
+  Trash2,
+  type LucideIcon,
+} from "lucide-react";
 import { Button } from "../components/interaction/Button";
 import { PillSelect } from "../components/interaction/PillSelect";
 import {
@@ -25,6 +37,30 @@ import { reportUiError } from "../lib/reportError";
 import "./FutureFeaturesPage.css";
 
 const CUSTOM_TYPE_VALUE = "__custom__";
+
+const STATUS_ICONS: Record<FutureFeatureStatus, LucideIcon> = {
+  idea: Lightbulb,
+  ready: CircleCheck,
+  in_progress: LoaderCircle,
+  done: BadgeCheck,
+  parked: CirclePause,
+  wont_do: Ban,
+};
+
+function StatusIcon({
+  status,
+  size = 14,
+}: {
+  status: FutureFeatureStatus;
+  size?: number;
+}) {
+  const Icon = STATUS_ICONS[status];
+  return <Icon size={size} strokeWidth={2.25} aria-hidden />;
+}
+
+function statusLabel(status: FutureFeatureStatus): string {
+  return FUTURE_FEATURE_STATUSES.find((s) => s.value === status)?.label ?? status;
+}
 
 type Draft = {
   title: string;
@@ -101,10 +137,6 @@ function draftToInput(draft: Draft): FutureFeatureInput {
     payloadJson: payloadJson || null,
     executionNotes: draft.executionNotes.trim() || null,
   };
-}
-
-function statusLabel(status: FutureFeatureStatus): string {
-  return FUTURE_FEATURE_STATUSES.find((s) => s.value === status)?.label ?? status;
 }
 
 /** Split body into paragraph cards: blank lines first, else one card per non-empty line. */
@@ -342,7 +374,12 @@ export function FutureFeaturesPage() {
   );
 
   const statusPillOptions = useMemo(
-    () => FUTURE_FEATURE_STATUSES.map((s) => ({ value: s.value, label: s.label })),
+    () =>
+      FUTURE_FEATURE_STATUSES.map((s) => ({
+        value: s.value,
+        label: s.label,
+        icon: <StatusIcon status={s.value} />,
+      })),
     [],
   );
 
@@ -550,6 +587,7 @@ export function FutureFeaturesPage() {
                   </span>
                   <span className="ff-topline-cell">
                     <span className={`ff-pill status-${feature.status}`}>
+                      <StatusIcon status={feature.status} />
                       {statusLabel(feature.status)}
                     </span>
                   </span>

@@ -59,6 +59,12 @@
   color: var(--accent-contrast);
 }
 
+.pill-select-option-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
 .pill-select-more {
   border-style: dashed;
   color: var(--text-dim);

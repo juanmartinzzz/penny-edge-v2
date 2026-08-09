@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import "./PillSelect.css";
 
 export type PillOption = {
   value: string;
   label: string;
+  icon?: ReactNode;
 };
 
 type PillSelectBase = {
@@ -119,6 +120,11 @@ export function PillSelect(props: PillSelectProps) {
               className={`pill-select-option${selected ? " is-selected" : ""}`}
               onClick={() => handleSelect(option.value)}
             >
+              {option.icon ? (
+                <span className="pill-select-option-icon" aria-hidden>
+                  {option.icon}
+                </span>
+              ) : null}
               {option.label}
             </button>
           );
