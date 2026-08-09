@@ -98,6 +98,30 @@ const UNION_SQL = `
     finished_at,
     created_at
   FROM swatch_runs
+
+  UNION ALL
+
+  SELECT
+    r.id AS id,
+    'spa' AS kind,
+    'spa:' || lower(e.code) AS slug,
+    e.code AS exchange_code,
+    e.label AS exchange_label,
+    r.exchange_id AS scanner_id,
+    r.status AS status,
+    r.trigger AS trigger,
+    r.offset AS offset,
+    r.page_size AS page_size,
+    r.scanned AS scanned,
+    NULL AS matched,
+    NULL AS succeeded,
+    NULL AS failed,
+    r.error AS error,
+    r.started_at AS started_at,
+    r.finished_at AS finished_at,
+    r.created_at AS created_at
+  FROM spa_runs r
+  JOIN spa_exchanges e ON e.id = r.exchange_id
 `;
 
 export async function listJobRuns(

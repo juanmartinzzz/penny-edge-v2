@@ -1,0 +1,131 @@
+.spa {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 980px;
+}
+
+.spa-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.spa-header h1 {
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  line-height: 0.95;
+}
+
+.spa-header h1 .acronym-label-short {
+  font-size: inherit;
+}
+
+.spa-header h1 .acronym-label-full {
+  font-size: 0.72rem;
+  margin-top: 0.15rem;
+  white-space: normal;
+  max-width: 28ch;
+}
+
+.spa-header p {
+  max-width: 52ch;
+}
+
+.spa-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.spa-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.spa-card-title-text {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.spa-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-full);
+  padding: 0.2rem 0.65rem;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.spa-pill.is-on {
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border-color: var(--accent);
+}
+
+.spa-pill.is-running {
+  border-color: var(--text-muted);
+}
+
+.spa-pill.is-market-open {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
+  color: var(--text);
+}
+
+.spa-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.85rem;
+  align-items: center;
+}
+
+.spa-status-copy {
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-dim);
+}
+
+.spa-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.spa-sample-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  width: 100%;
+}
+
+.spa-empty,
+.spa-loading {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin: 0;
+}
+
+.spa-error {
+  color: var(--danger, #c44);
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.spa .is-error {
+  color: var(--danger, #c44);
+}

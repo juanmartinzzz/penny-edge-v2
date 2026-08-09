@@ -12,7 +12,8 @@
     "YAHOO_STALE_AFTER_MINUTES": "60",
     "SCANNER_PAGE_SIZE": "50",
     "ANALYSIS_PAGE_SIZE": "5",
-    "TEMPERATURE_PAGE_SIZE": "25"
+    "TEMPERATURE_PAGE_SIZE": "25",
+    "SPA_PAGE_SIZE": "200"
   },
   "triggers": {
     "crons": ["*/5 * * * *"]
@@ -38,6 +39,10 @@
       {
         "binding": "TEMPERATURE_QUEUE",
         "queue": "penny-edge-temperature-jobs"
+      },
+      {
+        "binding": "SPA_QUEUE",
+        "queue": "penny-edge-spa-jobs"
       }
     ],
     "consumers": [
@@ -55,6 +60,12 @@
       },
       {
         "queue": "penny-edge-temperature-jobs",
+        "max_batch_size": 1,
+        "max_retries": 3,
+        "max_batch_timeout": 5
+      },
+      {
+        "queue": "penny-edge-spa-jobs",
         "max_batch_size": 1,
         "max_retries": 3,
         "max_batch_timeout": 5

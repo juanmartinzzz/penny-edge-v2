@@ -46,6 +46,7 @@ const KIND_FILTER_OPTIONS = [
   { value: "evg", label: `EVG · ${PRODUCT_NAMES.EVG}` },
   { value: "tas", label: `TAS · ${PRODUCT_NAMES.TAS}` },
   { value: "his", label: `HIS · ${PRODUCT_NAMES.HIS}` },
+  { value: "spa", label: `SPA · ${PRODUCT_NAMES.SPA}` },
   { value: "swatch", label: `SWATCH · ${PRODUCT_NAMES.SWATCH}` },
 ];
 
@@ -492,7 +493,8 @@ export function HomePage() {
                   When{" "}
                   <AcronymLabel acronym="EVG" layout="inline" />,{" "}
                   <AcronymLabel acronym="TAS" layout="inline" />,{" "}
-                  <AcronymLabel acronym="HIS" layout="inline" />, and{" "}
+                  <AcronymLabel acronym="HIS" layout="inline" />,{" "}
+                  <AcronymLabel acronym="SPA" layout="inline" />, and{" "}
                   <AcronymLabel acronym="SWATCH" layout="inline" /> jobs actually
                   started — newest first.
                 </p>
@@ -563,6 +565,15 @@ export function HomePage() {
                                 {run.kind === "evg" ? (
                                   <>
                                     <AcronymLabel acronym="EVG" layout="inline" />
+                                    {run.exchangeCode ? (
+                                      <span className="home-timeline-exchange">
+                                        {run.exchangeCode}
+                                      </span>
+                                    ) : null}
+                                  </>
+                                ) : run.kind === "spa" ? (
+                                  <>
+                                    <AcronymLabel acronym="SPA" layout="inline" />
                                     {run.exchangeCode ? (
                                       <span className="home-timeline-exchange">
                                         {run.exchangeCode}

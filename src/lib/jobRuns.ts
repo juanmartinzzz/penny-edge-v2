@@ -1,9 +1,9 @@
 /**
- * Client for unified EVG / TAS / HIS / SWATCH job-run history.
+ * Client for unified EVG / TAS / HIS / SWATCH / SPA job-run history.
  */
 import { apiFetch } from "./api";
 
-export type JobRunKind = "evg" | "tas" | "his" | "swatch";
+export type JobRunKind = "evg" | "tas" | "his" | "swatch" | "spa";
 export type JobRunStatus = "queued" | "running" | "ok" | "error";
 export type JobRunTrigger = "manual" | "cron";
 
@@ -63,13 +63,19 @@ export function formatJobRunDetail(run: JobRun): string {
   if (run.kind === "evg") {
     return `${detail.matched ?? 0}/${detail.scanned} gated`;
   }
+  if (run.kind === "spa") {
+    return `${detail.scanned} archived`;
+  }
   if (run.kind === "swatch") {
     return `${detail.succeeded ?? 0} ok · ${detail.failed ?? 0} failed · ${detail.scanned} watched`;
   }
   return `${detail.succeeded ?? 0} ok · ${detail.failed ?? 0} failed · ${detail.scanned} scanned`;
 }
 
-export function formatJobRunError(error: string | null | undefined, max = 80): string | null {
+export function formatJobRunError(
+  error: string | null | undefined,
+  max = 80,
+): string | null {
   if (!error) return null;
   const trimmed = error.trim();
   if (!trimmed) return null;

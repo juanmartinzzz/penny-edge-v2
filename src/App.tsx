@@ -4,6 +4,7 @@ import { AnalysisPage } from "./pages/AnalysisPage";
 import { FutureFeaturesPage } from "./pages/FutureFeaturesPage";
 import { HomePage } from "./pages/HomePage";
 import { ScannersPage } from "./pages/ScannersPage";
+import { SpaPage } from "./pages/SpaPage";
 import { SwatchPage } from "./pages/SwatchPage";
 import { TemperaturePage } from "./pages/TemperaturePage";
 
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="scanners" element={<ScannersPage />} />
           <Route path="analysis" element={<AnalysisPage />} />
           <Route path="temperature" element={<TemperaturePage />} />
+          <Route path="spa" element={<SpaPage />} />
           <Route path="swatch" element={<SwatchPage />} />
           <Route path="future-features" element={<FutureFeaturesPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

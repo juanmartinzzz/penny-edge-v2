@@ -3,7 +3,7 @@
  * Backed by scanner_runs, analysis_runs, temperature_runs, swatch_runs rows.
  */
 
-export const JOB_RUN_KINDS = ["evg", "tas", "his", "swatch"] as const;
+export const JOB_RUN_KINDS = ["evg", "tas", "his", "swatch", "spa"] as const;
 export type JobRunKind = (typeof JOB_RUN_KINDS)[number];
 
 export const JOB_RUN_STATUSES = ["queued", "running", "ok", "error"] as const;

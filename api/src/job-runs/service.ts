@@ -26,10 +26,12 @@ function serializeJobRun(row: JobRunListRow) {
         ? "TAS"
         : row.kind === "his"
           ? "HIS"
-          : "SWATCH";
+          : row.kind === "spa"
+            ? "SPA"
+            : "SWATCH";
 
   const label =
-    row.kind === "evg" && row.exchange_code
+    (row.kind === "evg" || row.kind === "spa") && row.exchange_code
       ? `${acronym} · ${row.exchange_code}`
       : acronym;
 
@@ -74,7 +76,7 @@ export async function listJobRunsOverview(env: JobRunsEnv, query: JobRunListQuer
   let kind: JobRunKind | undefined;
   if (query.kind !== undefined && query.kind !== "" && query.kind !== "all") {
     if (!isJobRunKind(query.kind)) {
-      throw new Error(`kind must be one of: evg, tas, his, swatch`);
+      throw new Error(`kind must be one of: evg, tas, his, swatch, spa`);
     }
     kind = query.kind;
   }

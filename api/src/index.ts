@@ -62,6 +62,18 @@ import {
   startSwatchRun,
   type SwatchEnv,
 } from "./swatch/service";
+import {
+  getSpaDetail,
+  getSpaOverview,
+  getSpaRunStatus,
+  getSpaSampleDetail,
+  patchSpaExchange,
+  processDueSpa,
+  processSpaJob,
+  startSpaRun,
+  type SpaEnv,
+} from "./spa/service";
+import type { SpaJobMessage } from "./spa/types";
 
 // Durable Object class must be exported from the Worker entrypoint.
 export { CoinGeckoRateLimiter } from "./market/binance/rate-limiter";
@@ -71,13 +83,18 @@ type AppBindings = ScannerEnv &
   TemperatureEnv &
   FutureFeaturesEnv &
   JobRunsEnv &
-  SwatchEnv;
+  SwatchEnv &
+  SpaEnv;
 
 type AppEnv = {
   Bindings: AppBindings;
 };
 
-type QueueMessage = ScannerJobMessage | AnalysisJobMessage | TemperatureJobMessage;
+type QueueMessage =
+  | ScannerJobMessage
+  | AnalysisJobMessage
+  | TemperatureJobMessage
+  | SpaJobMessage;
 
 const ALLOWED_ORIGINS = [
   "http://localhost:5292",
@@ -135,6 +152,11 @@ app.get("/", (c) =>
       "/swatch/assets/:id",
       "/swatch/run",
       "/swatch/runs/:runId",
+      "/spa",
+      "/spa/:id",
+      "/spa/:id/run",
+      "/spa/runs/:runId",
+      "/spa/samples/:sampleId",
       "/future-features",
       "/future-features/types",
       "/future-features/counts",
@@ -520,6 +542,66 @@ app.post("/swatch/run", async (c) => {
   }
 });
 
+app.get("/spa", async (c) => {
+  const exchanges = await getSpaOverview(c.env);
+  return c.json({ exchanges });
+});
+
+app.get("/spa/runs/:runId", async (c) => {
+  const run = await getSpaRunStatus(c.env, c.req.param("runId"));
+  if (!run) return c.json({ error: "Run not found" }, 404);
+  return c.json({ run });
+});
+
+app.get("/spa/samples/:sampleId", async (c) => {
+  const sample = await getSpaSampleDetail(c.env, c.req.param("sampleId"));
+  if (!sample) return c.json({ error: "Sample not found" }, 404);
+  return c.json({ sample });
+});
+
+app.get("/spa/:id", async (c) => {
+  const detail = await getSpaDetail(c.env, c.req.param("id"));
+  if (!detail) return c.json({ error: "SPA exchange not found" }, 404);
+  return c.json({ exchange: detail });
+});
+
+app.patch("/spa/:id", async (c) => {
+  try {
+    const body = await c.req.json<{
+      enabled?: boolean;
+      intervalMinutes?: number;
+      retentionDays?: number;
+      enabledQuoteAssets?: string[];
+    }>();
+    const exchange = await patchSpaExchange(c.env, c.req.param("id"), body);
+    if (!exchange) return c.json({ error: "SPA exchange not found" }, 404);
+    return c.json({ exchange });
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to update SPA",
+      },
+      400,
+    );
+  }
+});
+
+app.post("/spa/:id/run", async (c) => {
+  try {
+    const run = await startSpaRun(c.env, c.req.param("id"), "manual");
+    return c.json({ run }, 202);
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to start SPA run",
+      },
+      409,
+    );
+  }
+});
+
 app.get("/future-features/types", async (c) => {
   const result = await listFeatureTypes(c.env);
   return c.json(result);
@@ -609,6 +691,8 @@ export default {
           await processAnalysisJob(env, body);
         } else if (body.type === "temperature_page") {
           await processTemperatureJob(env, body);
+        } else if (body.type === "spa_page") {
+          await processSpaJob(env, body);
         } else {
           console.error("Unknown queue message type", body);
         }
@@ -634,6 +718,9 @@ export default {
         }),
         processDueSwatch(env).then((started) => {
           console.log(`Cron started ${started} SWATCH run(s)`);
+        }),
+        processDueSpa(env).then((started) => {
+          console.log(`Cron started ${started} SPA run(s)`);
         }),
       ]),
     );
