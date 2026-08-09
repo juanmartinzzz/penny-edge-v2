@@ -11,6 +11,8 @@ export type SpaApiCall = {
   pageOffset: number;
   pageSize: number;
   quoteCount: number;
+  /** Actual Yahoo / CoinGecko HTTP requests for this job chunk. */
+  upstreamRequests?: number;
   latencyMs: number;
   ok: boolean;
   error?: string;
@@ -40,7 +42,10 @@ export type SpaSampleMeta = {
   runId: string;
   sampledAt: string;
   symbolCount: number;
+  /** Upstream Yahoo/CoinGecko HTTP requests. */
   callCount: number;
+  /** SPA queue job chunks (optional on older payloads). */
+  jobChunks?: number;
   createdAt: string;
 };
 

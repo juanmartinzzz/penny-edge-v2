@@ -38,6 +38,7 @@ import {
   nowIso,
   parseCallsJson,
   parsePricesJson,
+  sumUpstreamRequests,
   type SpaApiCall,
   type SpaJobMessage,
   type SpaPricePoint,
@@ -46,12 +47,21 @@ import {
 
 export interface SpaEnv extends MarketEnv {
   SPA_QUEUE: Queue<SpaJobMessage>;
-  SPA_PAGE_SIZE?: string;
 }
 
-function pageSize(env: SpaEnv): number {
-  // Yahoo screener caps at 250; keep headroom under that.
-  return Math.min(Math.max(Number(env.SPA_PAGE_SIZE ?? "200") || 200, 25), 250);
+/**
+ * Per-provider screener maxima. Always use each API's hard max so SPA jobs
+ * pull as many quotes as possible per call and minimize upstream API traffic.
+ * Do not share one page size across providers — Yahoo's 200 is not CoinGecko's.
+ */
+const YAHOO_SCREENER_MAX = 200;
+/** CoinGecko `/exchanges/{id}/tickers` is fixed at 100/page (no `per_page`). */
+const COINGECKO_TICKERS_MAX = 100;
+
+function pageSizeForExchange(exchangeCode: string): number {
+  return isBinanceExchange(exchangeCode)
+    ? COINGECKO_TICKERS_MAX
+    : YAHOO_SCREENER_MAX;
 }
 
 export async function getSpaOverview(env: SpaEnv) {
@@ -238,7 +248,7 @@ export async function startSpaRun(
   }
 
   const runId = crypto.randomUUID();
-  const size = pageSize(env);
+  const size = pageSizeForExchange(exchange.code);
   const run = await createSpaRun(env.DB, {
     id: runId,
     exchangeId,
@@ -326,7 +336,7 @@ export async function processSpaJob(
       : undefined;
 
     const startedMs = Date.now();
-    const page = await market.screen({
+    const { quotes: page, upstreamRequests } = await market.screen({
       exchange: exchange.code,
       offset: message.offset,
       limit: run.page_size,
@@ -341,6 +351,7 @@ export async function processSpaJob(
       pageOffset: message.offset,
       pageSize: run.page_size,
       quoteCount: page.length,
+      upstreamRequests,
       latencyMs: Date.now() - startedMs,
       ok: true,
     };
@@ -547,13 +558,17 @@ function serializeRun(run: NonNullable<Awaited<ReturnType<typeof getSpaRun>>>) {
 function serializeSampleMeta(
   sample: Awaited<ReturnType<typeof listSpaSamples>>[number],
 ) {
+  const calls = parseCallsJson(sample.calls_json);
   return {
     id: sample.id,
     exchangeId: sample.exchange_id,
     runId: sample.run_id,
     sampledAt: sample.sampled_at,
     symbolCount: sample.symbol_count,
-    callCount: parseCallsJson(sample.calls_json).length,
+    /** Vendor Yahoo/CoinGecko HTTP requests (primary cost signal). */
+    callCount: sumUpstreamRequests(calls),
+    /** SPA queue job chunks (secondary). */
+    jobChunks: calls.length,
     createdAt: sample.created_at,
   };
 }

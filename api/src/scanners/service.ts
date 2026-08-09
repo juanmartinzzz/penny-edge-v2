@@ -312,7 +312,7 @@ export async function processScannerJob(
     const quoteAssets = isBinanceExchange(scanner.code)
       ? parseEnabledQuoteAssets(scanner.enabled_quote_assets)
       : undefined;
-    const page = await market.screen({
+    const { quotes: page } = await market.screen({
       exchange: scanner.code,
       offset: message.offset,
       limit: run.page_size,

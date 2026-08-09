@@ -13,7 +13,12 @@ export const COINGECKO_API_BASE = "https://api.coingecko.com/api/v3";
 
 export const COINGECKO_BINANCE_TICKERS_URL = `${COINGECKO_API_BASE}/exchanges/binance/tickers`;
 
-/** CoinGecko returns up to 100 tickers per page. */
+/**
+ * Hard max tickers per `/exchanges/{id}/tickers` call (not a default).
+ * Docs: "Tickers are paginated to 100 items per page." There is no `per_page`.
+ * Always request full pages (paginate with `page`) to minimize API calls.
+ * @see https://docs.coingecko.com/reference/exchanges-id-tickers
+ */
 export const COINGECKO_TICKERS_PAGE_SIZE = 100;
 
 /** Safety cap so a runaway screen cannot burn the Demo monthly credit. */

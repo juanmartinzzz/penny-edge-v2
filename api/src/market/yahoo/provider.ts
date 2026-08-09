@@ -7,6 +7,7 @@ import type {
   ProviderAuthStatus,
   Quote,
   Range,
+  ScreenResult,
   ScreenerQuery,
 } from "../types";
 import {
@@ -121,12 +122,13 @@ export class YahooMarketDataProvider implements MarketDataProvider {
     };
   }
 
-  async screen(query: ScreenerQuery): Promise<Quote[]> {
+  async screen(query: ScreenerQuery): Promise<ScreenResult> {
     const exchange = toYahooScreenerExchange(query.exchange);
     const offset = query.offset ?? 0;
-    const limit = Math.min(query.limit ?? 25, 250);
+    // Yahoo screener `size` hard max is 200 — always request the max to minimize API calls.
+    const limit = Math.min(query.limit ?? 200, 200);
 
-    return this.withAuthRetry(async (auth) => {
+    const quotes = await this.withAuthRetry(async (auth) => {
       const url = new URL("https://query1.finance.yahoo.com/v1/finance/screener");
       url.searchParams.set("crumb", auth.crumb);
 
@@ -164,9 +166,12 @@ export class YahooMarketDataProvider implements MarketDataProvider {
         finance?: { result?: Array<{ quotes?: YahooQuoteRaw[] }> };
       };
 
-      const quotes = data.finance?.result?.[0]?.quotes ?? [];
-      return quotes.map(mapYahooQuote);
+      const raw = data.finance?.result?.[0]?.quotes ?? [];
+      return raw.map(mapYahooQuote);
     });
+
+    // One screener POST per screen() window (auth refresh is separate if needed).
+    return { quotes, upstreamRequests: 1 };
   }
 
   private async withAuthRetry<T>(

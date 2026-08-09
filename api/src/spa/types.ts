@@ -78,6 +78,11 @@ export type SpaApiCall = {
   pageOffset: number;
   pageSize: number;
   quoteCount: number;
+  /**
+   * Actual Yahoo / CoinGecko HTTP requests made for this SPA job chunk.
+   * Older samples may omit this; treat missing as 1 per chunk when summing.
+   */
+  upstreamRequests?: number;
   latencyMs: number;
   ok: boolean;
   error?: string;
@@ -107,6 +112,11 @@ export function parseCallsJson(raw: string | null): SpaApiCall[] {
   } catch {
     return [];
   }
+}
+
+/** Sum vendor HTTP requests; fall back to 1 per job chunk for legacy logs. */
+export function sumUpstreamRequests(calls: SpaApiCall[]): number {
+  return calls.reduce((sum, call) => sum + (call.upstreamRequests ?? 1), 0);
 }
 
 export function parsePricesJson(raw: string | null): SpaPricePoint[] {

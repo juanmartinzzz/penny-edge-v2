@@ -94,7 +94,11 @@ function draftMatches(exchange: SpaExchange, draft: SpaDraft): boolean {
 
 function runLabel(run: SpaRun | null, exchange: SpaExchange): string {
   if (run && (run.status === "queued" || run.status === "running")) {
-    return `${run.status} · ${run.scanned} quotes · ${run.pages} pages`;
+    const upstream = run.calls.reduce(
+      (sum, call) => sum + (call.upstreamRequests ?? 1),
+      0,
+    );
+    return `${run.status} · ${run.scanned} quotes · ${upstream} upstream · ${run.pages} jobs`;
   }
   if (exchange.lastRunStatus === "error" && exchange.lastRunError) {
     return exchange.lastRunError;
@@ -120,9 +124,16 @@ const sampleColumns: TableColumn<SpaSampleMeta>[] = [
   },
   {
     id: "callCount",
-    header: "API calls",
+    header: "Upstream",
     align: "right",
     accessor: (row) => row.callCount,
+    cell: (row) => {
+      const chunks = row.jobChunks;
+      if (chunks != null && chunks !== row.callCount) {
+        return `${row.callCount} (${chunks} jobs)`;
+      }
+      return String(row.callCount);
+    },
   },
 ];
 
@@ -139,8 +150,14 @@ const callColumns: TableColumn<SpaApiCall>[] = [
     accessor: (row) => row.endpoint,
   },
   {
+    id: "upstream",
+    header: "Upstream",
+    align: "right",
+    accessor: (row) => row.upstreamRequests ?? 1,
+  },
+  {
     id: "page",
-    header: "Page",
+    header: "Job chunk",
     align: "right",
     accessor: (row) => row.pageOffset,
     cell: (row) => `${row.pageOffset}+${row.pageSize}`,
@@ -613,7 +630,7 @@ export function SpaPage() {
         id: "samples",
         title: "Recent samples",
         description:
-          "Each row is one exchange-wide snapshot. Expand for API calls + prices.",
+          "Each row is one exchange-wide snapshot. Expand for upstream requests + prices.",
         columns: [
           <TableExpandableRows
             key="samples"
@@ -646,8 +663,9 @@ export function SpaPage() {
     if (opts.running && liveCalls.length > 0) {
       sections.push({
         id: "live-calls",
-        title: "Live API calls",
-        description: "Pages fetched in the active sample run.",
+        title: "Live upstream requests",
+        description:
+          "Yahoo/CoinGecko HTTP calls in the active run (job chunks are Worker packaging).",
         columns: [
           <TableExpandableRows
             key="live-calls"

@@ -58,6 +58,13 @@ export interface ScreenerQuery {
   quoteAssets?: string[];
 }
 
+/** Result of a screener window, including vendor HTTP cost. */
+export interface ScreenResult {
+  quotes: Quote[];
+  /** Actual Yahoo / CoinGecko HTTP requests made for this screen() call. */
+  upstreamRequests: number;
+}
+
 export interface ProviderAuthStatus {
   provider: ProviderId;
   present: boolean;
@@ -73,7 +80,7 @@ export interface MarketDataProvider {
     ref: InstrumentRef,
     opts: { interval: Interval; range: Range },
   ): Promise<ChartResult>;
-  screen(query: ScreenerQuery): Promise<Quote[]>;
+  screen(query: ScreenerQuery): Promise<ScreenResult>;
   getAuthStatus(): Promise<ProviderAuthStatus>;
   refreshAuth(): Promise<ProviderAuthStatus>;
 }

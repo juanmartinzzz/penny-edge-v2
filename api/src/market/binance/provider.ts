@@ -6,6 +6,7 @@ import type {
   ProviderAuthStatus,
   Quote,
   Range,
+  ScreenResult,
   ScreenerQuery,
 } from "../types";
 import {
@@ -172,21 +173,28 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
    * Paginate CoinGecko Binance tickers (volume desc), filter by quote asset,
    * return EVG offset/limit window as Quotes with dailyQuoteNotional.
    */
-  async screen(query: ScreenerQuery): Promise<Quote[]> {
+  async screen(query: ScreenerQuery): Promise<ScreenResult> {
     this.requireKey();
 
     const offset = query.offset ?? 0;
-    const limit = Math.min(query.limit ?? 50, 200);
+    // Cap at CoinGecko's hard max per HTTP page — never reuse Yahoo's limit.
+    // screen() still walks CoinGecko pages of 100 raw tickers until this many
+    // quote-filtered results are collected (or the exchange is exhausted).
+    const requested = query.limit ?? COINGECKO_TICKERS_PAGE_SIZE;
+    const limit = Math.min(Math.max(requested, 0), COINGECKO_TICKERS_PAGE_SIZE);
     const quoteAssets = (
       query.quoteAssets?.length
         ? query.quoteAssets
         : DEFAULT_BINANCE_QUOTE_ASSETS
     ).map((asset) => asset.toUpperCase());
     const quoteSet = new Set(quoteAssets);
-    if (quoteSet.size === 0 || limit <= 0) return [];
+    if (quoteSet.size === 0 || limit <= 0) {
+      return { quotes: [], upstreamRequests: 0 };
+    }
 
     const collected: Quote[] = [];
     let skipped = 0;
+    let upstreamRequests = 0;
 
     for (let page = 1; page <= COINGECKO_MAX_PAGES; page++) {
       const tickers = await fetchCoinGeckoBinanceTickerPage(
@@ -194,6 +202,7 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
         page,
         this.fetchOpts,
       );
+      upstreamRequests += 1;
       if (tickers.length === 0) break;
 
       for (const ticker of tickers) {
@@ -213,13 +222,15 @@ export class BinanceMarketDataProvider implements MarketDataProvider {
         }
 
         collected.push(quote);
-        if (collected.length >= limit) return collected;
+        if (collected.length >= limit) {
+          return { quotes: collected, upstreamRequests };
+        }
       }
 
       if (tickers.length < COINGECKO_TICKERS_PAGE_SIZE) break;
     }
 
-    return collected;
+    return { quotes: collected, upstreamRequests };
   }
 
   private requireKey(): void {

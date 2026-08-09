@@ -240,7 +240,7 @@ app.post("/market/screener", async (c) => {
   }
 
   const market = createMarketDataService(c.env);
-  const quotes = await market.screen({
+  const { quotes } = await market.screen({
     exchange: body.exchange,
     offset: body.offset,
     limit: body.limit,

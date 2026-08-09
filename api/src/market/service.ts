@@ -6,6 +6,7 @@ import type {
   ProviderAuthStatus,
   Quote,
   Range,
+  ScreenResult,
   ScreenerQuery,
 } from "./types";
 import { BinanceMarketDataProvider } from "./binance/provider";
@@ -77,7 +78,7 @@ export class RoutingMarketDataProvider implements MarketDataProvider {
     return this.forExchange(ref.exchange).getChart(ref, opts);
   }
 
-  screen(query: ScreenerQuery): Promise<Quote[]> {
+  screen(query: ScreenerQuery): Promise<ScreenResult> {
     return this.forExchange(query.exchange).screen(query);
   }
 }
@@ -100,7 +101,7 @@ export class MarketDataService {
     return this.provider.getChart(ref, opts);
   }
 
-  screen(query: ScreenerQuery): Promise<Quote[]> {
+  screen(query: ScreenerQuery): Promise<ScreenResult> {
     return this.provider.screen(query);
   }
 
