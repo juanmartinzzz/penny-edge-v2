@@ -85,7 +85,7 @@ type FeatureEditorProps = {
   onCancel: () => void;
 };
 
-function emptyDraft(defaultType = "visibility"): Draft {
+function emptyDraft(defaultType = "market_data"): Draft {
   return {
     title: "",
     body: "",
@@ -402,7 +402,7 @@ export function FutureFeaturesPage() {
   function openCreate() {
     setCreating(true);
     setEditingId(null);
-    setDraft(emptyDraft(typeOptions[0]?.value ?? "visibility"));
+    setDraft(emptyDraft(typeOptions[0]?.value ?? "market_data"));
     setError(null);
   }
 
@@ -486,7 +486,7 @@ export function FutureFeaturesPage() {
           <div>
             <h1>Future Features</h1>
             <p>
-              Capture capability ideas — logging, visibility, detection power, and
+              Capture capability ideas — market data, alerting, scoring, and
               anything custom — then mark them ready for later execution.
             </p>
           </div>

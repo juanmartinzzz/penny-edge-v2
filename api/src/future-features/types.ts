@@ -16,14 +16,13 @@ export type FutureFeatureStatus = (typeof FUTURE_FEATURE_STATUSES)[number];
 
 /** Built-in capability types (not departments). Custom types are allowed. */
 export const BUILTIN_FEATURE_TYPES = [
-  { value: "logging", label: "Logging" },
-  { value: "visibility", label: "Visibility" },
-  { value: "detection_power", label: "Detection power" },
+  { value: "market_data", label: "Market data" },
   { value: "alerting", label: "Alerting" },
-  { value: "filtering", label: "Filtering" },
-  { value: "reliability", label: "Reliability" },
-  { value: "performance", label: "Performance" },
-  { value: "data_quality", label: "Data quality" },
+  { value: "scoring", label: "Scoring" },
+  { value: "automation", label: "Automation" },
+  { value: "cost_control", label: "Cost control" },
+  { value: "monitoring", label: "Monitoring" },
+  { value: "ui", label: "UI" },
 ] as const;
 
 export type BuiltinFeatureType = (typeof BUILTIN_FEATURE_TYPES)[number]["value"];
