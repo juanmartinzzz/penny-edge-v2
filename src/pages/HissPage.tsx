@@ -19,6 +19,8 @@ import {
   getHissOverview,
   isHotHissTemperature,
   listHissSymbols,
+  loadHissFilterDefaults,
+  saveHissFilterDefaults,
   type HissOverview,
   type HissSymbol,
 } from "../lib/hiss";
@@ -113,14 +115,18 @@ const symbolColumns: TableColumn<HissSymbol>[] = [
 ];
 
 export function HissPage() {
+  const initialFilters = useMemo(
+    () => loadHissFilterDefaults(ALL_EXCHANGES),
+    [],
+  );
   const [overview, setOverview] = useState<HissOverview | null>(null);
   const [symbols, setSymbols] = useState<HissSymbol[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [exchangeId, setExchangeId] = useState(ALL_EXCHANGES);
-  const [minAvg10d, setMinAvg10d] = useState("");
-  const [minLastDay, setMinLastDay] = useState("");
+  const [exchangeId, setExchangeId] = useState(initialFilters.exchangeId);
+  const [minAvg10d, setMinAvg10d] = useState(initialFilters.minAvg10d);
+  const [minLastDay, setMinLastDay] = useState(initialFilters.minLastDay);
 
   const exchangeOptions = useMemo(() => {
     const items = (overview?.exchanges ?? []).map((ex) => ({
@@ -130,35 +136,45 @@ export function HissPage() {
     return [{ value: ALL_EXCHANGES, label: "All exchanges" }, ...items];
   }, [overview]);
 
+  useEffect(() => {
+    saveHissFilterDefaults({ exchangeId, minAvg10d, minLastDay });
+  }, [exchangeId, minAvg10d, minLastDay]);
+
   const filterSections: SectionsCardSection[] = [
     {
-      id: "filters",
+      id: "exchange",
+      title: "Exchange",
+      columns: [
+        <PillSelect
+          key="exchange"
+          options={exchangeOptions}
+          value={exchangeId}
+          onChange={setExchangeId}
+        />,
+      ],
+    },
+    {
+      id: "volumes",
       title: "Volume filters",
       description:
         "Only symbols that clear these mins are listed. Leave blank for any.",
       columns: [
-        <div key="filters" className="hiss-filters">
-          <PillSelect
-            label="Exchange"
-            options={exchangeOptions}
-            value={exchangeId}
-            onChange={setExchangeId}
-          />
-          <NumericInput
-            label="Min avg vol 10d USDT"
-            value={minAvg10d}
-            onChange={(e) => setMinAvg10d(e.target.value)}
-            min={0}
-            placeholder="Any"
-          />
-          <NumericInput
-            label="Min last full day vol USDT"
-            value={minLastDay}
-            onChange={(e) => setMinLastDay(e.target.value)}
-            min={0}
-            placeholder="Any"
-          />
-        </div>,
+        <NumericInput
+          key="avg10d"
+          label="Min avg vol 10d USDT"
+          value={minAvg10d}
+          onChange={(e) => setMinAvg10d(e.target.value)}
+          min={0}
+          placeholder="Any"
+        />,
+        <NumericInput
+          key="lastDay"
+          label="Min last full day vol USDT"
+          value={minLastDay}
+          onChange={(e) => setMinLastDay(e.target.value)}
+          min={0}
+          placeholder="Any"
+        />,
       ],
     },
   ];

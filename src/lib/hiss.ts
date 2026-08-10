@@ -87,3 +87,52 @@ export function foldHiss(body: { exchangeId: string; sampleId?: string }) {
 export function isHotHissTemperature(value: number | null | undefined): boolean {
   return value != null && value >= 70;
 }
+
+const FILTERS_STORAGE_KEY = "penny-edge.hiss.filters";
+
+/** Default volume gate mins (USDT). */
+export const DEFAULT_HISS_MIN_AVG_VOLUME_10D = 1_000_000;
+export const DEFAULT_HISS_MIN_VOLUME_LAST_FULL_DAY = 2_000_000;
+
+export type HissFilterDefaults = {
+  exchangeId: string;
+  minAvg10d: string;
+  minLastDay: string;
+};
+
+export function loadHissFilterDefaults(
+  allExchangesValue: string,
+): HissFilterDefaults {
+  const base: HissFilterDefaults = {
+    exchangeId: allExchangesValue,
+    minAvg10d: String(DEFAULT_HISS_MIN_AVG_VOLUME_10D),
+    minLastDay: String(DEFAULT_HISS_MIN_VOLUME_LAST_FULL_DAY),
+  };
+  try {
+    const raw = localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (!raw) return base;
+    const parsed = JSON.parse(raw) as Partial<HissFilterDefaults>;
+    return {
+      exchangeId:
+        typeof parsed.exchangeId === "string" && parsed.exchangeId.trim()
+          ? parsed.exchangeId
+          : base.exchangeId,
+      minAvg10d:
+        typeof parsed.minAvg10d === "string" ? parsed.minAvg10d : base.minAvg10d,
+      minLastDay:
+        typeof parsed.minLastDay === "string"
+          ? parsed.minLastDay
+          : base.minLastDay,
+    };
+  } catch {
+    return base;
+  }
+}
+
+export function saveHissFilterDefaults(filters: HissFilterDefaults): void {
+  try {
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(filters));
+  } catch {
+    // ignore quota / private mode
+  }
+}
