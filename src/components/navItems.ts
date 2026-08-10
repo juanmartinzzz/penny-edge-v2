@@ -31,9 +31,9 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "scanners", acronym: "EVG", path: "/scanners", icon: Radar },
   { id: "analysis", acronym: "TAS", path: "/analysis", icon: LineChart },
   { id: "temperature", acronym: "HIS", path: "/temperature", icon: Thermometer },
-  { id: "hiss", acronym: "HISS", path: "/hiss", icon: Flame },
-  { id: "spa", acronym: "SPA", path: "/spa", icon: Archive },
   { id: "swatch", acronym: "SWATCH", path: "/swatch", icon: Eye },
+  { id: "spa", acronym: "SPA", path: "/spa", icon: Archive },
+  { id: "hiss", acronym: "HISS", path: "/hiss", icon: Flame },
   {
     id: "future-features",
     label: "Future Features",

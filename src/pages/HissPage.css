@@ -31,11 +31,26 @@
   max-width: 56ch;
 }
 
-.hiss-meta {
+.hiss-filters-title-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.65rem;
   align-items: center;
+  gap: 0.5rem 0.75rem;
+  min-width: 0;
+}
+
+.hiss-filters-title-text {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.hiss-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.85rem 1rem;
+  align-items: flex-end;
 }
 
 .hiss-pill {
@@ -51,13 +66,6 @@
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-}
-
-.hiss-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.85rem 1rem;
-  align-items: flex-end;
 }
 
 .hiss-status {

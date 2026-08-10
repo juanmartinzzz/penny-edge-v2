@@ -6,11 +6,15 @@ import { Button } from "../components/interaction/Button";
 import { NumericInput } from "../components/interaction/NumericInput";
 import { PillSelect } from "../components/interaction/PillSelect";
 import {
+  SectionsCard,
+  type SectionsCardSection,
+} from "../components/interaction/SectionsCard";
+import {
   TableExpandableRows,
   type TableColumn,
 } from "../components/interaction/TableExpandableRows";
 import { formatDateTime } from "../lib/dates";
-import { formatAdaptiveNumber } from "../lib/formatNumber";
+import { formatAdaptiveNumber, formatCompactVolume } from "../lib/formatNumber";
 import {
   getHissOverview,
   isHotHissTemperature,
@@ -56,17 +60,17 @@ const symbolColumns: TableColumn<HissSymbol>[] = [
   },
   {
     id: "avg10d",
-    header: "Avg vol 10d",
+    header: "Avg vol 10d USDT",
     align: "right",
     accessor: (row) => row.avgVolume10d,
-    cell: (row) => formatAdaptiveNumber(row.avgVolume10d),
+    cell: (row) => formatCompactVolume(row.avgVolume10d),
   },
   {
     id: "lastDay",
-    header: "Last full day",
+    header: "Last full day vol USDT",
     align: "right",
     accessor: (row) => row.volumeLastFullDay,
-    cell: (row) => formatAdaptiveNumber(row.volumeLastFullDay),
+    cell: (row) => formatCompactVolume(row.volumeLastFullDay),
   },
   {
     id: "price",
@@ -126,6 +130,39 @@ export function HissPage() {
     return [{ value: ALL_EXCHANGES, label: "All exchanges" }, ...items];
   }, [overview]);
 
+  const filterSections: SectionsCardSection[] = [
+    {
+      id: "filters",
+      title: "Volume filters",
+      description:
+        "Only symbols that clear these mins are listed. Leave blank for any.",
+      columns: [
+        <div key="filters" className="hiss-filters">
+          <PillSelect
+            label="Exchange"
+            options={exchangeOptions}
+            value={exchangeId}
+            onChange={setExchangeId}
+          />
+          <NumericInput
+            label="Min avg vol 10d USDT"
+            value={minAvg10d}
+            onChange={(e) => setMinAvg10d(e.target.value)}
+            min={0}
+            placeholder="Any"
+          />
+          <NumericInput
+            label="Min last full day vol USDT"
+            value={minLastDay}
+            onChange={(e) => setMinLastDay(e.target.value)}
+            min={0}
+            placeholder="Any"
+          />
+        </div>,
+      ],
+    },
+  ];
+
   async function load() {
     setLoading(true);
     setError(null);
@@ -176,47 +213,35 @@ export function HissPage() {
         </p>
       </header>
 
-      <div className="hiss-meta">
-        <span className="hiss-pill">
-          {overview?.totalSymbols ?? 0} symbols tracked
-        </span>
-        {overview?.lastUpdatedAt ? (
-          <span className="hiss-status">
-            Last fold {formatDateTime(overview.lastUpdatedAt)}
-          </span>
-        ) : (
-          <span className="hiss-status">
-            Waiting for the next {PRODUCT_NAMES.SPA} sample…
-          </span>
-        )}
-      </div>
-
-      <section className="hiss-filters" aria-label="Volume filters">
-        <PillSelect
-          label="Exchange"
-          options={exchangeOptions}
-          value={exchangeId}
-          onChange={setExchangeId}
-        />
-        <NumericInput
-          label="Min avg vol 10d"
-          value={minAvg10d}
-          onChange={(e) => setMinAvg10d(e.target.value)}
-          min={0}
-          placeholder="Any"
-        />
-        <NumericInput
-          label="Min last full day vol"
-          value={minLastDay}
-          onChange={(e) => setMinLastDay(e.target.value)}
-          min={0}
-          placeholder="Any"
-        />
-        <Button variant="primary" onClick={() => void load()} disabled={loading}>
-          <RefreshCw size={14} strokeWidth={2.5} />
-          Apply filters
-        </Button>
-      </section>
+      <SectionsCard
+        id="hiss.filters"
+        collapsible
+        defaultCollapsed
+        title={
+          <div className="hiss-filters-title-row">
+            <strong className="hiss-filters-title-text">Filters</strong>
+            <span className="hiss-pill">
+              {overview?.totalSymbols ?? 0} symbols tracked
+            </span>
+            <span className="hiss-status">
+              {overview?.lastUpdatedAt
+                ? `Last fold ${formatDateTime(overview.lastUpdatedAt)}`
+                : `Waiting for ${PRODUCT_NAMES.SPA}…`}
+            </span>
+          </div>
+        }
+        sections={filterSections}
+        footer={
+          <Button
+            variant="primary"
+            onClick={() => void load()}
+            disabled={loading}
+          >
+            <RefreshCw size={14} strokeWidth={2.5} />
+            Apply filters
+          </Button>
+        }
+      />
 
       {error ? <p className="hiss-error">{error}</p> : null}
 
@@ -250,8 +275,8 @@ export function HissPage() {
                   <strong>Name</strong> {row.name ?? "—"}
                 </div>
                 <div>
-                  <strong>Last volume</strong>{" "}
-                  {formatAdaptiveNumber(row.lastVolume)}
+                  <strong>Last volume USDT</strong>{" "}
+                  {formatCompactVolume(row.lastVolume)}
                 </div>
                 <div>
                   <strong>Depth %</strong>{" "}
