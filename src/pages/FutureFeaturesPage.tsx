@@ -1,20 +1,29 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
+  Activity,
   BadgeCheck,
   Ban,
+  Bell,
+  CandlestickChart,
   ChevronDown,
   CircleCheck,
+  CircleDollarSign,
   CirclePause,
+  Gauge,
+  LayoutTemplate,
   Lightbulb,
   LoaderCircle,
   Plus,
   Save,
+  Shapes,
+  Tag,
   Trash2,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "../components/interaction/Button";
-import { PillSelect } from "../components/interaction/PillSelect";
+import { PillSelect, type PillOption } from "../components/interaction/PillSelect";
 import {
   SectionsCard,
   type SectionsCardSection,
@@ -47,6 +56,16 @@ const STATUS_ICONS: Record<FutureFeatureStatus, LucideIcon> = {
   wont_do: Ban,
 };
 
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  market_data: CandlestickChart,
+  alerting: Bell,
+  scoring: Gauge,
+  automation: Workflow,
+  cost_control: CircleDollarSign,
+  monitoring: Activity,
+  ui: LayoutTemplate,
+};
+
 function StatusIcon({
   status,
   size = 14,
@@ -55,6 +74,11 @@ function StatusIcon({
   size?: number;
 }) {
   const Icon = STATUS_ICONS[status];
+  return <Icon size={size} strokeWidth={2.25} aria-hidden />;
+}
+
+function TypeIcon({ type, size = 14 }: { type: string; size?: number }) {
+  const Icon = TYPE_ICONS[type] ?? (type === CUSTOM_TYPE_VALUE ? Shapes : Tag);
   return <Icon size={size} strokeWidth={2.25} aria-hidden />;
 }
 
@@ -78,8 +102,8 @@ type FeatureEditorProps = {
   title: string;
   draft: Draft;
   busy: boolean;
-  typePillOptions: { value: string; label: string }[];
-  statusPillOptions: { value: string; label: string }[];
+  typePillOptions: PillOption[];
+  statusPillOptions: PillOption[];
   onDraftChange: (updater: (draft: Draft) => Draft) => void;
   onSave: () => void;
   onCancel: () => void;
@@ -367,8 +391,13 @@ export function FutureFeaturesPage() {
       ...typeOptions.map((t) => ({
         value: t.value,
         label: t.builtin ? t.label : `${t.label} (custom)`,
+        icon: <TypeIcon type={t.value} />,
       })),
-      { value: CUSTOM_TYPE_VALUE, label: "Custom…" },
+      {
+        value: CUSTOM_TYPE_VALUE,
+        label: "Custom…",
+        icon: <TypeIcon type={CUSTOM_TYPE_VALUE} />,
+      },
     ],
     [typeOptions],
   );
@@ -394,6 +423,7 @@ export function FutureFeaturesPage() {
       ...typeOptions.map((t) => ({
         value: t.value,
         label: t.builtin ? t.label : `${t.label} (custom)`,
+        icon: <TypeIcon type={t.value} />,
       })),
     ],
     [typeOptions],
@@ -605,7 +635,10 @@ export function FutureFeaturesPage() {
               >
                 <div className="ff-item-topline">
                   <span className="ff-topline-cell">
-                    <span className="ff-type">{feature.typeLabel}</span>
+                    <span className="ff-type">
+                      <TypeIcon type={feature.type} />
+                      {feature.typeLabel}
+                    </span>
                   </span>
                   <span className="ff-topline-cell">
                     <span className={`ff-pill status-${feature.status}`}>
