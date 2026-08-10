@@ -67,6 +67,12 @@ If a symbol disappears from a SPA sample, HISS **keeps the last row** (no soft-d
 
 No automatic backfill in product/UI. After enough SPA history exists, ops can manually rescan samples into HISS (out of band). Until then, volume averages and some temps stay partial/null — expected.
 
+## Manual archive backfill
+
+To rebuild HISS from all retained SPA samples (wipe ledger first, then replay
+oldest→newest per exchange), use a one-off local script against remote D1 —
+not a product UI. See ops notes when running; do not leave temp runners in git.
+
 ## API
 
 | Method | Path | Notes |

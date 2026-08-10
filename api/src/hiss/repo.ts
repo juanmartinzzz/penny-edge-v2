@@ -14,6 +14,11 @@ export async function listHissSymbolsForExchange(
   return result.results ?? [];
 }
 
+export async function clearAllHissSymbols(db: D1Database): Promise<number> {
+  const result = await db.prepare(`DELETE FROM hiss_symbols`).run();
+  return result.meta.changes ?? 0;
+}
+
 export async function countHissSymbols(db: D1Database): Promise<number> {
   const row = await db
     .prepare(`SELECT COUNT(*) AS count FROM hiss_symbols`)

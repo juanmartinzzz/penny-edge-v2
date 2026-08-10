@@ -3,14 +3,19 @@
  * Folds each SPA sample into the per-symbol ledger. Does not touch current HIS.
  */
 import { isBinanceExchange } from "../market/binance/constants";
-import type { SpaPricePoint } from "../spa/types";
-import { getSpaExchange, getSpaSample } from "../spa/repo";
-import { parsePricesJson } from "../spa/types";
+import {
+  getSpaExchange,
+  getSpaSample,
+  listSpaExchanges,
+  listSpaSamplesChronological,
+} from "../spa/repo";
+import { parsePricesJson, type SpaPricePoint } from "../spa/types";
 import {
   foldPriceObservation,
   scoreHissTemperature,
 } from "./temperature";
 import {
+  clearAllHissSymbols,
   countHissSymbols,
   countHissSymbolsByExchange,
   countHissSymbolsFiltered,
@@ -19,12 +24,14 @@ import {
   listHissSymbolsForExchange,
   upsertHissSymbolsBatch,
   type HissListFilters,
+  type HissUpsertInput,
 } from "./repo";
 import {
   emptyHissMemory,
   nowIso,
   parseMemoryJson,
   serializeMemory,
+  type HissSymbolMemory,
   type HissSymbolRow,
 } from "./types";
 import {
@@ -38,6 +45,16 @@ export type HissFoldInput = {
   sampleId: string;
   sampledAt: string;
   prices: SpaPricePoint[];
+};
+
+type LedgerEntry = {
+  id: string;
+  symbol: string;
+  name: string | null;
+  memory: HissSymbolMemory;
+  createdAt: string;
+  temperatureAt: string | null;
+  lastUpsert: HissUpsertInput | null;
 };
 
 /**
@@ -69,21 +86,36 @@ export function volumeForHiss(
   return null;
 }
 
-export async function foldHissFromSample(
-  db: D1Database,
+function ledgerFromRows(rows: HissSymbolRow[]): Map<string, LedgerEntry> {
+  const map = new Map<string, LedgerEntry>();
+  for (const row of rows) {
+    map.set(row.symbol, {
+      id: row.id,
+      symbol: row.symbol,
+      name: row.name,
+      memory: parseMemoryJson(row.memory_json),
+      createdAt: row.created_at,
+      temperatureAt: row.temperature_at,
+      lastUpsert: null,
+    });
+  }
+  return map;
+}
+
+/** Fold one SPA sample into an in-memory ledger. Returns upserts for symbols in this sample. */
+function applySampleToLedger(
+  ledger: Map<string, LedgerEntry>,
   input: HissFoldInput,
-): Promise<{ updated: number }> {
-  const existing = await listHissSymbolsForExchange(db, input.exchangeId);
-  const bySymbol = new Map(existing.map((row) => [row.symbol, row]));
-  const at = nowIso();
-  const upserts = [];
+  at: string,
+): HissUpsertInput[] {
+  const upserts: HissUpsertInput[] = [];
 
   for (const point of input.prices) {
     const symbol = point.s?.trim().toUpperCase();
     if (!symbol) continue;
 
-    const prev = bySymbol.get(symbol);
-    let memory = prev ? parseMemoryJson(prev.memory_json) : emptyHissMemory();
+    const prev = ledger.get(symbol);
+    let memory = prev ? prev.memory : emptyHissMemory();
     const vol = volumeForHiss(point, input.exchangeCode);
 
     const volFold = foldVolumeObservation(memory, input.sampledAt, vol);
@@ -92,14 +124,18 @@ export async function foldHissFromSample(
     memory = recordDailyClose(memory, input.sampledAt, point.p);
 
     const score = scoreHissTemperature(memory);
-    const createdAt = prev?.created_at ?? at;
+    const createdAt = prev?.createdAt ?? at;
+    const id = prev?.id ?? crypto.randomUUID();
+    const name = point.n?.trim() || prev?.name || null;
+    const temperatureAt =
+      score.temperature != null ? at : (prev?.temperatureAt ?? null);
 
-    upserts.push({
-      id: prev?.id ?? crypto.randomUUID(),
+    const upsert: HissUpsertInput = {
+      id,
       exchangeId: input.exchangeId,
       exchangeCode: input.exchangeCode,
       symbol,
-      name: point.n?.trim() || prev?.name || null,
+      name,
       lastPrice: point.p,
       lastVolume: vol,
       lastSampleAt: input.sampledAt,
@@ -109,13 +145,34 @@ export async function foldHissFromSample(
       volumeCoverageDays: volFold.volumeCoverageDays,
       temperature: score.temperature,
       temperatureComponentsJson: JSON.stringify(score.components),
-      temperatureAt: score.temperature != null ? at : prev?.temperature_at ?? null,
+      temperatureAt,
       memoryJson: serializeMemory(memory),
       createdAt,
       updatedAt: at,
+    };
+
+    ledger.set(symbol, {
+      id,
+      symbol,
+      name,
+      memory,
+      createdAt,
+      temperatureAt,
+      lastUpsert: upsert,
     });
+    upserts.push(upsert);
   }
 
+  return upserts;
+}
+
+export async function foldHissFromSample(
+  db: D1Database,
+  input: HissFoldInput,
+): Promise<{ updated: number }> {
+  const existing = await listHissSymbolsForExchange(db, input.exchangeId);
+  const ledger = ledgerFromRows(existing);
+  const upserts = applySampleToLedger(ledger, input, nowIso());
   // Missing-from-sample: keep last (no delete / no touch).
   await upsertHissSymbolsBatch(db, upserts);
   return { updated: upserts.length };
@@ -151,6 +208,72 @@ export async function foldHissFromStoredSample(
   });
 
   return { updated: result.updated, sampleId: sample.id };
+}
+
+/**
+ * Wipe HISS and replay every SPA sample oldest→newest per exchange.
+ * Ops / one-off backfill — not exposed in the UI.
+ */
+export async function backfillHissFromSpaArchive(db: D1Database): Promise<{
+  cleared: number;
+  exchanges: Array<{
+    exchangeCode: string;
+    samples: number;
+    symbols: number;
+  }>;
+}> {
+  const cleared = await clearAllHissSymbols(db);
+  const exchanges = await listSpaExchanges(db);
+  const report: Array<{
+    exchangeCode: string;
+    samples: number;
+    symbols: number;
+  }> = [];
+
+  for (const exchange of exchanges) {
+    const samples = await listSpaSamplesChronological(db, exchange.id);
+    if (samples.length === 0) {
+      report.push({
+        exchangeCode: exchange.code,
+        samples: 0,
+        symbols: 0,
+      });
+      continue;
+    }
+
+    const ledger = new Map<string, LedgerEntry>();
+    let at = nowIso();
+
+    for (const sample of samples) {
+      at = nowIso();
+      const prices = parsePricesJson(sample.prices_json);
+      applySampleToLedger(
+        ledger,
+        {
+          exchangeId: exchange.id,
+          exchangeCode: exchange.code,
+          sampleId: sample.id,
+          sampledAt: sample.sampled_at,
+          prices,
+        },
+        at,
+      );
+    }
+
+    const upserts: HissUpsertInput[] = [];
+    for (const entry of ledger.values()) {
+      if (entry.lastUpsert) upserts.push(entry.lastUpsert);
+    }
+    await upsertHissSymbolsBatch(db, upserts);
+
+    report.push({
+      exchangeCode: exchange.code,
+      samples: samples.length,
+      symbols: upserts.length,
+    });
+  }
+
+  return { cleared, exchanges: report };
 }
 
 export async function getHissOverview(db: D1Database) {

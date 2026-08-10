@@ -363,6 +363,24 @@ export async function listSpaSamples(
   return result.results ?? [];
 }
 
+/** Full samples oldest→newest (includes prices_json). For HISS archive replay. */
+export async function listSpaSamplesChronological(
+  db: D1Database,
+  exchangeId: string,
+): Promise<SpaSampleRow[]> {
+  const result = await db
+    .prepare(
+      `SELECT id, exchange_id, run_id, sampled_at, symbol_count,
+              prices_json, calls_json, created_at
+       FROM spa_samples
+       WHERE exchange_id = ?
+       ORDER BY sampled_at ASC, created_at ASC`,
+    )
+    .bind(exchangeId)
+    .all<SpaSampleRow>();
+  return result.results ?? [];
+}
+
 export async function countSpaSamples(
   db: D1Database,
   exchangeId: string,
