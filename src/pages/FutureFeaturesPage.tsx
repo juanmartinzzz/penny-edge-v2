@@ -467,7 +467,7 @@ export function FutureFeaturesPage() {
     {
       id: "browse",
       title: "Browse",
-      description: "Narrow the backlog by status, type, or free-text search.",
+      description: "Narrow the backlog by status or type.",
       columns: [
         <PillSelect
           key="status"
@@ -483,13 +483,19 @@ export function FutureFeaturesPage() {
           value={typeFilter}
           onChange={setTypeFilter}
         />,
+      ],
+    },
+    {
+      id: "search",
+      title: "Search",
+      columns: [
         <label key="search" className="ff-field">
-          <span>Search</span>
           <input
             type="search"
             value={query}
             placeholder="Title, body…"
             onChange={(e) => setQuery(e.target.value)}
+            aria-label="Search"
           />
         </label>,
       ],
