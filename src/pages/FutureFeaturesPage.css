@@ -27,15 +27,19 @@
   gap: 1rem;
 }
 
-.future-features-filters {
+.ff-filters-title-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.85rem 1.25rem;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  min-width: 0;
 }
 
-.future-features-filters .pill-select {
-  flex: 1 1 220px;
+.ff-filters-title-text {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .ff-field {
@@ -43,10 +47,6 @@
   flex-direction: column;
   gap: 0.35rem;
   min-width: 140px;
-}
-
-.ff-field-grow {
-  flex: 1 1 200px;
 }
 
 .ff-field > span {

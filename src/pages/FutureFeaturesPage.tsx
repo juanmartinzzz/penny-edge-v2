@@ -463,6 +463,39 @@ export function FutureFeaturesPage() {
     }
   }
 
+  const filterSections: SectionsCardSection[] = [
+    {
+      id: "browse",
+      title: "Browse",
+      description: "Narrow the backlog by status, type, or free-text search.",
+      columns: [
+        <PillSelect
+          key="status"
+          label="Status"
+          options={statusFilterOptions}
+          value={statusFilter}
+          onChange={setStatusFilter}
+        />,
+        <PillSelect
+          key="type"
+          label="Type"
+          options={typeFilterOptions}
+          value={typeFilter}
+          onChange={setTypeFilter}
+        />,
+        <label key="search" className="ff-field">
+          <span>Search</span>
+          <input
+            type="search"
+            value={query}
+            placeholder="Title, body…"
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </label>,
+      ],
+    },
+  ];
+
   const showEmpty = !loading && features.length === 0 && !creating;
   const showList = !loading && (features.length > 0 || creating);
 
@@ -489,29 +522,20 @@ export function FutureFeaturesPage() {
         </div>
       </header>
 
-      <div className="future-features-filters">
-        <PillSelect
-          label="Status"
-          options={statusFilterOptions}
-          value={statusFilter}
-          onChange={setStatusFilter}
-        />
-        <PillSelect
-          label="Type"
-          options={typeFilterOptions}
-          value={typeFilter}
-          onChange={setTypeFilter}
-        />
-        <label className="ff-field ff-field-grow">
-          <span>Search</span>
-          <input
-            type="search"
-            value={query}
-            placeholder="Title, body…"
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-      </div>
+      <SectionsCard
+        id="future-features.filters"
+        collapsible
+        defaultCollapsed
+        title={
+          <div className="ff-filters-title-row">
+            <strong className="ff-filters-title-text">Filters</strong>
+            <span className="ff-pill status-idea">
+              {loading ? "…" : `${features.length} shown`}
+            </span>
+          </div>
+        }
+        sections={filterSections}
+      />
 
       {error ? <p className="future-features-error">{error}</p> : null}
       {loading ? <p className="future-features-status">Loading…</p> : null}
