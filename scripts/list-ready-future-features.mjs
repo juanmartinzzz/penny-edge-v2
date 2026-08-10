@@ -39,7 +39,7 @@ if (!allowed.has(status)) {
 const sql = `SELECT id, title, type, status, priority, payload_json, execution_notes, updated_at
 FROM future_features
 WHERE status = '${status}'
-ORDER BY priority DESC, updated_at DESC`;
+ORDER BY created_at DESC`;
 
 const wranglerArgs = [
   "d1",

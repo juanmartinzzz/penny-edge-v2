@@ -33,7 +33,7 @@ export async function listFutureFeatures(
     .prepare(
       `SELECT * FROM future_features
        ${where}
-       ORDER BY priority DESC, updated_at DESC`,
+       ORDER BY created_at DESC`,
     )
     .bind(...binds)
     .all<FutureFeatureRow>();

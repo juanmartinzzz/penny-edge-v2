@@ -318,7 +318,7 @@ export function FutureFeaturesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
-  /** Explicit expand/collapse; missing key → done collapsed, everything else expanded. */
+  /** Explicit expand/collapse; missing key → done/won't-do collapsed, else expanded. */
   const [expandOverrides, setExpandOverrides] = useState<Record<string, boolean>>(
     {},
   );
@@ -424,7 +424,9 @@ export function FutureFeaturesPage() {
   }
 
   function isFeatureExpanded(feature: FutureFeature): boolean {
-    return expandOverrides[feature.id] ?? feature.status !== "done";
+    const collapsedByDefault =
+      feature.status === "done" || feature.status === "wont_do";
+    return expandOverrides[feature.id] ?? !collapsedByDefault;
   }
 
   async function handleSave() {
@@ -460,16 +462,6 @@ export function FutureFeaturesPage() {
       setBusy(false);
     }
   }
-
-  const orderedFeatures = useMemo(() => {
-    const open: FutureFeature[] = [];
-    const done: FutureFeature[] = [];
-    for (const feature of features) {
-      if (feature.status === "done") done.push(feature);
-      else open.push(feature);
-    }
-    return [...open, ...done];
-  }, [features]);
 
   const showEmpty = !loading && features.length === 0 && !creating;
   const showList = !loading && (features.length > 0 || creating);
@@ -553,7 +545,7 @@ export function FutureFeaturesPage() {
             </li>
           ) : null}
 
-          {orderedFeatures.map((feature) => {
+          {features.map((feature) => {
             const active = editingId === feature.id;
             const expanded = isFeatureExpanded(feature);
             const collapsed = !expanded;

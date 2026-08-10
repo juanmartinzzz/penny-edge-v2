@@ -168,7 +168,7 @@ LIMIT 1`;
   return `SELECT ${columns}
 FROM future_features
 ${whereSql}
-ORDER BY priority DESC, updated_at DESC
+ORDER BY created_at DESC
 LIMIT ${opts.limit}`;
 }
 
