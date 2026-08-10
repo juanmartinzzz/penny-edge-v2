@@ -63,6 +63,11 @@ import {
   type SwatchEnv,
 } from "./swatch/service";
 import {
+  foldHissFromStoredSample,
+  getHissOverview,
+  getHissSymbols,
+} from "./hiss/service";
+import {
   getSpaDetail,
   getSpaOverview,
   getSpaRunStatus,
@@ -157,6 +162,9 @@ app.get("/", (c) =>
       "/spa/:id/run",
       "/spa/runs/:runId",
       "/spa/samples/:sampleId",
+      "/hiss",
+      "/hiss/symbols",
+      "/hiss/fold",
       "/future-features",
       "/future-features/types",
       "/future-features/counts",
@@ -602,6 +610,70 @@ app.post("/spa/:id/run", async (c) => {
           error instanceof Error ? error.message : "Failed to start SPA run",
       },
       409,
+    );
+  }
+});
+
+app.get("/hiss", async (c) => {
+  try {
+    const overview = await getHissOverview(c.env.DB);
+    return c.json(overview);
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to load HISS",
+      },
+      500,
+    );
+  }
+});
+
+app.get("/hiss/symbols", async (c) => {
+  try {
+    const result = await getHissSymbols(c.env.DB, {
+      exchangeId: c.req.query("exchangeId") ?? undefined,
+      minAvgVolume10d: c.req.query("minAvgVolume10d"),
+      minVolumeLastFullDay: c.req.query("minVolumeLastFullDay"),
+      limit: c.req.query("limit"),
+      offset: c.req.query("offset"),
+    });
+    return c.json(result);
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to list HISS symbols",
+      },
+      400,
+    );
+  }
+});
+
+app.post("/hiss/fold", async (c) => {
+  try {
+    const body = await c.req.json<{
+      exchangeId?: string;
+      sampleId?: string;
+    }>();
+    if (!body.exchangeId) {
+      return c.json({ error: "Body field 'exchangeId' is required" }, 400);
+    }
+    const result = await foldHissFromStoredSample(
+      c.env.DB,
+      body.exchangeId,
+      body.sampleId,
+    );
+    return c.json(result);
+  } catch (error) {
+    return c.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to fold HISS",
+      },
+      400,
     );
   }
 });

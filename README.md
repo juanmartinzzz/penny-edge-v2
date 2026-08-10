@@ -97,6 +97,16 @@ Product name for scheduled crash-heat scoring (0–100) of TAS snapshots. No Yah
 
 Runs process via Queue `penny-edge-temperature-jobs`. Same 5-minute cron; `next_run_at` gates work. High scores = deep, sharp, recent drops; flat/rising names are dampened.
 
+### Heat Interest SPA Scores (HISS)
+
+SPA-driven per-symbol ledger (volume averages + temperature), independent of current HIS. Each successful SPA sample folds the full venue into `hiss_symbols`. See `docs/hiss.md`.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/hiss` | Symbol counts + last fold time |
+| `GET` | `/hiss/symbols` | Filter by exchange / min avg 10d / min last full day vol |
+| `POST` | `/hiss/fold` | Manually fold a SPA sample into HISS |
+
 ## Design notes
 
 Monochrome UI with bold Manrope display type, IBM Plex Sans body, fully rounded buttons, and a collapsible left sidebar.

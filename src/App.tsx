@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { AnalysisPage } from "./pages/AnalysisPage";
 import { FutureFeaturesPage } from "./pages/FutureFeaturesPage";
+import { HissPage } from "./pages/HissPage";
 import { HomePage } from "./pages/HomePage";
 import { ScannersPage } from "./pages/ScannersPage";
 import { SpaPage } from "./pages/SpaPage";
@@ -17,6 +18,7 @@ export default function App() {
           <Route path="scanners" element={<ScannersPage />} />
           <Route path="analysis" element={<AnalysisPage />} />
           <Route path="temperature" element={<TemperaturePage />} />
+          <Route path="hiss" element={<HissPage />} />
           <Route path="spa" element={<SpaPage />} />
           <Route path="swatch" element={<SwatchPage />} />
           <Route path="future-features" element={<FutureFeaturesPage />} />

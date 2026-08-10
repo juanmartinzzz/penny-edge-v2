@@ -53,6 +53,7 @@ export type SpaPrice = {
   symbol: string;
   price: number | null;
   volume: number | null;
+  volumeQuote: number | null;
   name: string | null;
 };
 

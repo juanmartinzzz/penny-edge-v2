@@ -33,6 +33,7 @@ import {
   updateSpaExchange,
   updateSpaRun,
 } from "./repo";
+import { foldHissFromSample } from "../hiss/service";
 import {
   addMinutes,
   nowIso,
@@ -386,6 +387,9 @@ export async function processSpaJob(
         s: quote.symbol,
         p: quote.price,
         ...(quote.volume != null ? { v: quote.volume } : {}),
+        ...(quote.dailyQuoteNotional != null
+          ? { vq: quote.dailyQuoteNotional }
+          : {}),
         ...(quote.name ? { n: quote.name } : {}),
       }));
 
@@ -442,6 +446,22 @@ export async function processSpaJob(
       prices,
       calls,
     });
+
+    // HISS fold inline (simplest). Failures must not fail the SPA archive write.
+    try {
+      await foldHissFromSample(env.DB, {
+        exchangeId: exchange.id,
+        exchangeCode: exchange.code,
+        sampleId,
+        sampledAt: finishedAt,
+        prices,
+      });
+    } catch (hissError) {
+      console.error(
+        `HISS fold failed after SPA sample ${sampleId}:`,
+        hissError,
+      );
+    }
 
     await deleteSpaRunPages(env.DB, run.id);
 
@@ -523,6 +543,7 @@ export async function getSpaSampleDetail(env: SpaEnv, sampleId: string) {
       symbol: p.s,
       price: p.p,
       volume: p.v ?? null,
+      volumeQuote: p.vq ?? null,
       name: p.n ?? null,
     })),
     createdAt: sample.created_at,

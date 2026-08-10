@@ -68,7 +68,13 @@ export interface SpaSampleRow {
 export type SpaPricePoint = {
   s: string;
   p: number | null;
+  /** Share/base volume when available. */
   v?: number | null;
+  /**
+   * Quote-asset / USD notional volume (Binance → USDT/$ for HISS filters).
+   * Optional; older samples may omit it.
+   */
+  vq?: number | null;
   n?: string | null;
 };
 

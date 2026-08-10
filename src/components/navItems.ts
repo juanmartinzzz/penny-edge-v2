@@ -1,6 +1,7 @@
 import {
   Archive,
   Eye,
+  Flame,
   LayoutDashboard,
   Lightbulb,
   LineChart,
@@ -14,6 +15,7 @@ export type NavId =
   | "scanners"
   | "analysis"
   | "temperature"
+  | "hiss"
   | "spa"
   | "swatch"
   | "future-features";
@@ -29,6 +31,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "scanners", acronym: "EVG", path: "/scanners", icon: Radar },
   { id: "analysis", acronym: "TAS", path: "/analysis", icon: LineChart },
   { id: "temperature", acronym: "HIS", path: "/temperature", icon: Thermometer },
+  { id: "hiss", acronym: "HISS", path: "/hiss", icon: Flame },
   { id: "spa", acronym: "SPA", path: "/spa", icon: Archive },
   { id: "swatch", acronym: "SWATCH", path: "/swatch", icon: Eye },
   {
@@ -48,6 +51,9 @@ export function pathToNavId(pathname: string): NavId {
   }
   if (pathname === "/temperature" || pathname.startsWith("/temperature/")) {
     return "temperature";
+  }
+  if (pathname === "/hiss" || pathname.startsWith("/hiss/")) {
+    return "hiss";
   }
   if (pathname === "/spa" || pathname.startsWith("/spa/")) {
     return "spa";

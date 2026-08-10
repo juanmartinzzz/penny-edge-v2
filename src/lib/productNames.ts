@@ -3,6 +3,7 @@ export const PRODUCT_NAMES = {
   EVG: "Exchangewide Volume Gate",
   TAS: "Trend Analysis for Symbols",
   HIS: "Heat and Interest Scale",
+  HISS: "Heat Interest SPA Scores",
   COBUTA: "Consider Buying These Assets",
   SWATCH: "Sell Watch",
   SPA: "Symbol Price Archive",
