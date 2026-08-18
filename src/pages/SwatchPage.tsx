@@ -5,6 +5,10 @@ import { Button } from "../components/interaction/Button";
 import { NumericInput } from "../components/interaction/NumericInput";
 import { PillSelect } from "../components/interaction/PillSelect";
 import {
+  jobScheduleItems,
+  ScheduleStats,
+} from "../components/interaction/ScheduleStats";
+import {
   SectionsCard,
   type SectionsCardSection,
 } from "../components/interaction/SectionsCard";
@@ -35,7 +39,6 @@ import {
   type SwatchDirection,
   type SwatchFormDefaults,
   type SwatchOverview,
-  type SwatchRun,
 } from "../lib/swatch";
 import { PRODUCT_NAMES } from "../lib/productNames";
 import { formatDateTime } from "../lib/dates";
@@ -476,20 +479,6 @@ export function SwatchPage() {
     return editDrafts[asset.id] ?? assetToEditDraft(asset, formDefaults);
   }
 
-  function runLabel(run: SwatchRun | null, data: SwatchOverview): string {
-    if (run && (run.status === "queued" || run.status === "running")) {
-      return `${run.status} · ${run.scanned} watched · ${run.alerted} alerted`;
-    }
-    if (data.config.lastRunStatus === "error") {
-      return data.config.lastRunError ?? "Last run failed";
-    }
-    if (data.config.lastRunAt) {
-      const failed = data.config.lastRunFailed ?? 0;
-      return `Last run ${formatDateTime(data.config.lastRunAt)} · ${data.config.lastRunOk ?? 0} ok · ${failed} failed · ${data.config.lastRunAlerted ?? 0} alerted`;
-    }
-    return "Never run";
-  }
-
   const running =
     overview?.activeRun?.status === "queued" ||
     overview?.activeRun?.status === "running";
@@ -757,20 +746,6 @@ export function SwatchPage() {
   const scheduleSections: SectionsCardSection[] = overview
     ? [
         {
-          id: "status",
-          title: "Status",
-          columns: [
-            <div key="status" className="swatch-status-row">
-              <span className={`swatch-pill${running ? " is-running" : ""}`}>
-                {overview.enabledCount}/{overview.assetCount} watching
-              </span>
-              <span className="swatch-status-copy">
-                {runLabel(overview.activeRun, overview)}
-              </span>
-            </div>,
-          ],
-        },
-        {
           id: "schedule",
           title: "Global schedule",
           description:
@@ -965,19 +940,35 @@ export function SwatchPage() {
                 >
                   {overview.config.enabled ? "ON" : "OFF"}
                 </span>
-                <strong className="swatch-settings-title-text">Settings</strong>
-                <span
-                  className={
-                    overview.config.lastRunStatus === "error"
-                      ? "swatch-settings-inline is-error"
-                      : "swatch-settings-inline"
-                  }
-                >
-                  {overview.config.enabled
-                    ? `Next ${formatDateTime(overview.config.nextRunAt)}`
-                    : "Scheduler idle"}
+                <span className={`swatch-pill${running ? " is-running" : ""}`}>
+                  {overview.enabledCount}/{overview.assetCount} watching
                 </span>
+                <strong className="swatch-settings-title-text">Settings</strong>
               </div>
+            }
+            meta={
+              <ScheduleStats
+                items={jobScheduleItems({
+                  lastAt: overview.config.lastRunAt,
+                  nextAt: overview.config.nextRunAt,
+                  enabled: overview.config.enabled,
+                  lastStatus: overview.config.lastRunStatus,
+                  lastError: overview.config.lastRunError,
+                  lastOk: overview.config.lastRunOk,
+                  lastFailed: overview.config.lastRunFailed,
+                  lastAlerted: overview.config.lastRunAlerted,
+                  showFailed: true,
+                  run: overview.activeRun
+                    ? {
+                        status: overview.activeRun.status,
+                        scanned: overview.activeRun.scanned,
+                        ok: overview.activeRun.succeeded,
+                        failed: overview.activeRun.failed,
+                        alerted: overview.activeRun.alerted,
+                      }
+                    : null,
+                })}
+              />
             }
             sections={scheduleSections}
           />

@@ -4,6 +4,10 @@ import { Play, Save } from "lucide-react";
 import { Button } from "../components/interaction/Button";
 import { NumericInput } from "../components/interaction/NumericInput";
 import {
+  jobScheduleItems,
+  ScheduleStats,
+} from "../components/interaction/ScheduleStats";
+import {
   SectionsCard,
   type SectionsCardSection,
 } from "../components/interaction/SectionsCard";
@@ -19,7 +23,6 @@ import {
   runAnalysis,
   updateAnalysis,
   type AnalysisOverview,
-  type AnalysisRun,
   type AnalysisSymbol,
 } from "../lib/analysis";
 import { PRODUCT_NAMES } from "../lib/productNames";
@@ -249,19 +252,6 @@ export function AnalysisPage() {
     }
   }
 
-  function runLabel(run: AnalysisRun | null, data: AnalysisOverview): string {
-    if (run && (run.status === "queued" || run.status === "running")) {
-      return `${run.status} · ${run.scanned} scanned · ${run.succeeded} ok · ${run.failed} failed`;
-    }
-    if (data.config.lastRunStatus === "error") {
-      return data.config.lastRunError ?? "Last run failed";
-    }
-    if (data.config.lastRunAt) {
-      return `Last run ${formatDateTime(data.config.lastRunAt)} · ${data.config.lastRunOk ?? 0} ok`;
-    }
-    return "Never run";
-  }
-
   const running =
     overview?.activeRun?.status === "queued" ||
     overview?.activeRun?.status === "running";
@@ -349,25 +339,33 @@ export function AnalysisPage() {
             collapsible
             meta={
               <>
-                <span className={`analysis-pill${overview.config.enabled ? " is-on" : ""}`}>
-                  {overview.config.enabled ? "ON" : "OFF"}
-                </span>
-                <span className={`analysis-pill${running ? " is-running" : ""}`}>
-                  {overview.analyzedCount}/{overview.warmCount} analyzed
-                </span>
-                <span>{runLabel(overview.activeRun, overview)}</span>
-                <span
-                  className={
-                    overview.config.lastRunStatus === "error" ? "is-error" : undefined
-                  }
-                >
-                  {overview.config.enabled
-                    ? `Next run ${formatDateTime(overview.config.nextRunAt)}`
-                    : "Scheduler idle"}
-                  {running
-                    ? ` · ${overview.activeRun?.status} ${overview.activeRun?.scanned ?? 0}`
-                    : ""}
-                </span>
+                <div className="schedule-stats-pills">
+                  <span className={`analysis-pill${overview.config.enabled ? " is-on" : ""}`}>
+                    {overview.config.enabled ? "ON" : "OFF"}
+                  </span>
+                  <span className={`analysis-pill${running ? " is-running" : ""}`}>
+                    {overview.analyzedCount}/{overview.warmCount} analyzed
+                  </span>
+                </div>
+                <ScheduleStats
+                  items={jobScheduleItems({
+                    lastAt: overview.config.lastRunAt,
+                    nextAt: overview.config.nextRunAt,
+                    enabled: overview.config.enabled,
+                    lastStatus: overview.config.lastRunStatus,
+                    lastError: overview.config.lastRunError,
+                    lastOk: overview.config.lastRunOk,
+                    lastFailed: overview.config.lastRunFailed,
+                    run: overview.activeRun
+                      ? {
+                          status: overview.activeRun.status,
+                          scanned: overview.activeRun.scanned,
+                          ok: overview.activeRun.succeeded,
+                          failed: overview.activeRun.failed,
+                        }
+                      : null,
+                  })}
+                />
               </>
             }
             sections={formSections}

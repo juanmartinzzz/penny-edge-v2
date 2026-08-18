@@ -6,6 +6,10 @@ import { Button } from "../components/interaction/Button";
 import { NumericInput } from "../components/interaction/NumericInput";
 import { PillSelect } from "../components/interaction/PillSelect";
 import {
+  datetimeStat,
+  ScheduleStats,
+} from "../components/interaction/ScheduleStats";
+import {
   SectionsCard,
   type SectionsCardSection,
 } from "../components/interaction/SectionsCard";
@@ -239,12 +243,18 @@ export function HissPage() {
             <span className="hiss-pill">
               {overview?.totalSymbols ?? 0} symbols tracked
             </span>
-            <span className="hiss-status">
-              {overview?.lastUpdatedAt
-                ? `Last fold ${formatDateTime(overview.lastUpdatedAt)}`
-                : `Waiting for ${PRODUCT_NAMES.SPA}…`}
-            </span>
           </div>
+        }
+        meta={
+          <ScheduleStats
+            items={[
+              datetimeStat(
+                "Last fold",
+                overview?.lastUpdatedAt,
+                `Waiting for ${PRODUCT_NAMES.SPA}…`,
+              ),
+            ]}
+          />
         }
         sections={filterSections}
         footer={

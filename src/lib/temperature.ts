@@ -111,6 +111,8 @@ export type TemperatureOverview = {
   scoredCount: number;
   defaults: TemperatureParams;
   activeRun: TemperatureRun | null;
+  /** TAS last completed run — HIS scores from those snapshots. */
+  tasLastRunAt: string | null;
 };
 
 export function getTemperature() {

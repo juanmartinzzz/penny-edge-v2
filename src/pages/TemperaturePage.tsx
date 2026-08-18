@@ -4,6 +4,11 @@ import { Play, Save, Thermometer, Tv } from "lucide-react";
 import { Button } from "../components/interaction/Button";
 import { NumericInput } from "../components/interaction/NumericInput";
 import {
+  datetimeStat,
+  jobScheduleItems,
+  ScheduleStats,
+} from "../components/interaction/ScheduleStats";
+import {
   SectionsCard,
   SectionsCardColumnLabel,
   type SectionsCardSection,
@@ -28,7 +33,6 @@ import {
   type TemperatureKnobMeta,
   type TemperatureOverview,
   type TemperatureParams,
-  type TemperatureRun,
   type TemperatureSymbol,
 } from "../lib/temperature";
 import { PRODUCT_NAMES } from "../lib/productNames";
@@ -353,19 +357,6 @@ export function TemperaturePage() {
     }
   }
 
-  function runLabel(run: TemperatureRun | null, data: TemperatureOverview): string {
-    if (run && (run.status === "queued" || run.status === "running")) {
-      return `${run.status} · ${run.scanned} scanned · ${run.succeeded} ok · ${run.failed} failed`;
-    }
-    if (data.config.lastRunStatus === "error") {
-      return data.config.lastRunError ?? "Last run failed";
-    }
-    if (data.config.lastRunAt) {
-      return `Last run ${formatDateTime(data.config.lastRunAt)} · ${data.config.lastRunOk ?? 0} ok`;
-    }
-    return "Never run";
-  }
-
   function setParam(key: keyof TemperatureParams, value: string) {
     setDraft((current) =>
       current
@@ -522,15 +513,43 @@ export function TemperaturePage() {
             collapsible
             meta={
               <>
-                <span
-                  className={`temperature-pill${overview.config.enabled ? " is-on" : ""}`}
-                >
-                  {overview.config.enabled ? "ON" : "OFF"}
-                </span>
-                <span className={`temperature-pill${running ? " is-running" : ""}`}>
-                  {overview.scoredCount}/{overview.analyzedCount} scored
-                </span>
-                <span>{runLabel(overview.activeRun, overview)}</span>
+                <div className="schedule-stats-pills">
+                  <span
+                    className={`temperature-pill${overview.config.enabled ? " is-on" : ""}`}
+                  >
+                    {overview.config.enabled ? "ON" : "OFF"}
+                  </span>
+                  <span className={`temperature-pill${running ? " is-running" : ""}`}>
+                    {overview.scoredCount}/{overview.analyzedCount} scored
+                  </span>
+                </div>
+                <ScheduleStats
+                  items={jobScheduleItems({
+                    lastAt: overview.config.lastRunAt,
+                    nextAt: overview.config.nextRunAt,
+                    enabled: overview.config.enabled,
+                    lastStatus: overview.config.lastRunStatus,
+                    lastError: overview.config.lastRunError,
+                    lastOk: overview.config.lastRunOk,
+                    lastFailed: overview.config.lastRunFailed,
+                    leading: [
+                      datetimeStat(
+                        "Last TAS",
+                        overview.tasLastRunAt,
+                        "Never run",
+                        "tas-last-run",
+                      ),
+                    ],
+                    run: overview.activeRun
+                      ? {
+                          status: overview.activeRun.status,
+                          scanned: overview.activeRun.scanned,
+                          ok: overview.activeRun.succeeded,
+                          failed: overview.activeRun.failed,
+                        }
+                      : null,
+                  })}
+                />
               </>
             }
             sections={formSections}
@@ -551,18 +570,6 @@ export function TemperaturePage() {
                   <Play size={16} strokeWidth={2.5} />
                   {running ? "Running…" : `Run ${PRODUCT_NAMES.HIS}`}
                 </Button>
-                <p
-                  className={`temperature-status${
-                    overview.config.lastRunStatus === "error" ? " is-error" : ""
-                  }`}
-                >
-                  {overview.config.enabled
-                    ? `Next run ${formatDateTime(overview.config.nextRunAt)}`
-                    : "Scheduler idle"}
-                  {running
-                    ? ` · ${overview.activeRun?.status} ${overview.activeRun?.scanned ?? 0}`
-                    : ""}
-                </p>
               </>
             }
           />

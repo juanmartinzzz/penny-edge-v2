@@ -1,0 +1,98 @@
+.schedule-stats-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.sections-card-chrome-row:has(.schedule-stats) {
+  align-items: center;
+}
+
+.sections-card-chrome-title:has(.schedule-stats) {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.sections-card-meta:has(.schedule-stats) {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.schedule-stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 1.15rem;
+  margin: 0;
+}
+
+.schedule-stats-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.schedule-stats-item dt {
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.schedule-stats-item dd {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.schedule-stats-item dd.is-muted {
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: normal;
+}
+
+.schedule-stats-item dd.is-error {
+  color: var(--danger);
+  font-weight: 700;
+  max-width: 28ch;
+  white-space: normal;
+}
+
+.schedule-stats-datetime {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.schedule-stats-date {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-muted);
+}
+
+.schedule-stats-time {
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+
+.schedule-stats-empty {
+  color: var(--text-dim);
+}

@@ -4,6 +4,7 @@
  * Only rescores symbols whose TAS (`analyzed_at`) is newer than last HIS
  * (`temperature_at`), or that have never been scored.
  */
+import { getAnalysisConfig } from "../analysis/repo";
 import { parseAnalysisJson } from "../analysis/types";
 import type { WarmSymbolRow } from "../scanners/types";
 import {
@@ -104,6 +105,27 @@ function parseComponentsJson(raw: string | null | undefined) {
   }
 }
 
+async function serializeOverview(
+  env: TemperatureEnv,
+  config: NonNullable<Awaited<ReturnType<typeof getTemperatureConfig>>>,
+) {
+  const [analyzedCount, scoredCount, activeRun, tasConfig] = await Promise.all([
+    countWarmWithAnalysis(env.DB),
+    countScoredWarmSymbols(env.DB),
+    getActiveTemperatureRun(env.DB),
+    getAnalysisConfig(env.DB),
+  ]);
+
+  return {
+    config: serializeConfig(config),
+    analyzedCount,
+    scoredCount,
+    defaults: DEFAULT_TEMPERATURE_PARAMS,
+    activeRun: activeRun ? serializeRun(activeRun) : null,
+    tasLastRunAt: tasConfig?.last_run_at ?? null,
+  };
+}
+
 function serializeWarmSymbol(row: WarmSymbolRow) {
   return {
     id: row.id,
@@ -128,19 +150,7 @@ export async function getTemperatureOverview(env: TemperatureEnv) {
     throw new Error("Temperature config missing — run D1 migrations");
   }
 
-  const [analyzedCount, scoredCount, activeRun] = await Promise.all([
-    countWarmWithAnalysis(env.DB),
-    countScoredWarmSymbols(env.DB),
-    getActiveTemperatureRun(env.DB),
-  ]);
-
-  return {
-    config: serializeConfig(config),
-    analyzedCount,
-    scoredCount,
-    defaults: DEFAULT_TEMPERATURE_PARAMS,
-    activeRun: activeRun ? serializeRun(activeRun) : null,
-  };
+  return serializeOverview(env, config);
 }
 
 export async function getTemperatureSymbols(env: TemperatureEnv) {
@@ -204,19 +214,7 @@ export async function patchTemperatureConfig(
   const updated = await updateTemperatureConfig(env.DB, patch);
   if (!updated) return null;
 
-  const [analyzedCount, scoredCount, activeRun] = await Promise.all([
-    countWarmWithAnalysis(env.DB),
-    countScoredWarmSymbols(env.DB),
-    getActiveTemperatureRun(env.DB),
-  ]);
-
-  return {
-    config: serializeConfig(updated),
-    analyzedCount,
-    scoredCount,
-    defaults: DEFAULT_TEMPERATURE_PARAMS,
-    activeRun: activeRun ? serializeRun(activeRun) : null,
-  };
+  return serializeOverview(env, updated);
 }
 
 export async function startTemperatureRun(
