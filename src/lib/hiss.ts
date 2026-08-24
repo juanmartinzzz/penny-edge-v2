@@ -90,11 +90,7 @@ export function foldHiss(body: { exchangeId: string; sampleId?: string }) {
 
 export const isHotHissTemperature = isHissHot;
 
-const FILTERS_STORAGE_KEY = "penny-edge.hiss.filters";
-
-/** Default volume gate mins (USDT). */
-export const DEFAULT_HISS_MIN_AVG_VOLUME_10D = 1_000_000;
-export const DEFAULT_HISS_MIN_VOLUME_LAST_FULL_DAY = 2_000_000;
+const FILTERS_STORAGE_KEY = "penny-edge.hiss.filters.v2";
 
 export type HissFilterDefaults = {
   exchangeId: string;
@@ -107,8 +103,8 @@ export function loadHissFilterDefaults(
 ): HissFilterDefaults {
   const base: HissFilterDefaults = {
     exchangeId: allExchangesValue,
-    minAvg10d: String(DEFAULT_HISS_MIN_AVG_VOLUME_10D),
-    minLastDay: String(DEFAULT_HISS_MIN_VOLUME_LAST_FULL_DAY),
+    minAvg10d: "",
+    minLastDay: "",
   };
   try {
     const raw = localStorage.getItem(FILTERS_STORAGE_KEY);

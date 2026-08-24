@@ -140,6 +140,15 @@ export function HissPage() {
     return [{ value: ALL_EXCHANGES, label: "All exchanges" }, ...items];
   }, [overview]);
 
+  const hotListCount = useMemo(() => {
+    if (!overview) return 0;
+    if (exchangeId === ALL_EXCHANGES) return overview.totalSymbols;
+    return (
+      overview.exchanges.find((ex) => ex.exchangeId === exchangeId)
+        ?.symbolCount ?? 0
+    );
+  }, [overview, exchangeId]);
+
   useEffect(() => {
     saveHissFilterDefaults({ exchangeId, minAvg10d, minLastDay });
   }, [exchangeId, minAvg10d, minLastDay]);
@@ -161,7 +170,7 @@ export function HissPage() {
       id: "volumes",
       title: "Volume filters",
       description:
-        "Only symbols that clear these mins are listed. Leave blank for any.",
+        "Hide hot-list names below these mins. Leave blank to show the full hot list.",
       columns: [
         <NumericInput
           key="avg10d"
@@ -242,7 +251,7 @@ export function HissPage() {
           <div className="hiss-filters-title-row">
             <strong className="hiss-filters-title-text">Filters</strong>
             <span className="hiss-pill">
-              {overview?.totalSymbols ?? 0} symbols tracked
+              {hotListCount} on the hot list
             </span>
           </div>
         }
@@ -280,8 +289,9 @@ export function HissPage() {
         <>
           {!loading ? (
             <p className="hiss-status">
-              Showing {symbols.length}
-              {total > symbols.length ? ` of ${total}` : ""} matching symbols
+              {total < hotListCount
+                ? `Showing ${total} of ${hotListCount} that pass volume filters`
+                : `Showing ${hotListCount} on the hot list`}
             </p>
           ) : null}
           <TableExpandableRows
