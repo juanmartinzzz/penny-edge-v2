@@ -1,8 +1,8 @@
 /**
  * HISS — Heat Interest SPA Scores service.
- * Grades live on each SPA photo. The table is a hot list (≥70), not notebooks.
+ * Grades live on each SPA photo. The table is a hot list (prefers ≥70), not notebooks.
  */
-import { isHissHot } from "../../../shared/hiss";
+import { selectHissHotRows } from "../../../shared/hiss";
 import { isBinanceExchange } from "../market/binance/constants";
 import {
   getLatestSpaSample,
@@ -149,7 +149,7 @@ function fatPointFromQuote(input: {
     vc: volFold.volumeCoverageDays,
   };
 
-  if (!symbol || !isHissHot(score.temperature)) {
+  if (!symbol || score.temperature == null) {
     return { point, hot: null };
   }
 
@@ -214,7 +214,7 @@ export function advanceSpaQuotes(input: {
     if (hotRow) hot.push(hotRow);
   }
 
-  return { prices, hot };
+  return { prices, hot: selectHissHotRows(hot) };
 }
 
 export async function publishHissHotList(
@@ -245,7 +245,7 @@ function hotFromFatPrices(
   const hot: HissUpsertInput[] = [];
   for (const point of input.prices) {
     const symbol = point.s?.trim().toUpperCase();
-    if (!symbol || !isHissHot(point.t ?? null)) continue;
+    if (!symbol || point.t == null) continue;
     const row = bootstrapBySymbol.get(symbol);
     const vol = volumeForHiss(point, input.exchangeCode);
     hot.push({
@@ -269,7 +269,7 @@ function hotFromFatPrices(
       updatedAt: at,
     });
   }
-  return hot;
+  return selectHissHotRows(hot);
 }
 
 /**

@@ -226,10 +226,11 @@ export function HissPage() {
           <AcronymLabel acronym="HISS" />
         </h1>
         <p>
-          Live scores (≥70) projected from each{" "}
-          <AcronymLabel acronym="SPA" layout="inline" /> photo. Notebooks live
-          on the latest sample — this table is the hot list only, independent of{" "}
-          <AcronymLabel acronym="HIS" layout="inline" />.
+          Live scores from each{" "}
+          <AcronymLabel acronym="SPA" layout="inline" /> photo. Prefers ≥70; if
+          none qualify, the cutoff drops by 10 until the list is non-empty.
+          Notebooks live on the latest sample — this table is the hot list only,
+          independent of <AcronymLabel acronym="HIS" layout="inline" />.
         </p>
       </header>
 
