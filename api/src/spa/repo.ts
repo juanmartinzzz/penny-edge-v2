@@ -371,7 +371,15 @@ async function inflateSamplePrices(
 ): Promise<SpaSampleRow | null> {
   if (!row) return null;
   const json = await decodeSpaPricesColumn(row.prices_json);
-  return { ...row, prices_json: json ?? "[]" };
+  if (json == null) {
+    if (row.symbol_count > 0) {
+      throw new Error(
+        `SPA sample ${row.id} has ${row.symbol_count} symbols but prices_json could not be decoded`,
+      );
+    }
+    return { ...row, prices_json: "[]" };
+  }
+  return { ...row, prices_json: json };
 }
 
 /** Write notebooks (and gzip) onto an existing sample. */

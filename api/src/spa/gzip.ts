@@ -20,6 +20,25 @@ function toUint8Array(raw: unknown): Uint8Array | null {
   if (ArrayBuffer.isView(raw)) {
     return new Uint8Array(raw.buffer, raw.byteOffset, raw.byteLength);
   }
+  // D1 sometimes returns blobs from another realm, or as a number[].
+  if (Array.isArray(raw) && raw.every((n) => typeof n === "number")) {
+    return Uint8Array.from(raw);
+  }
+  if (
+    raw &&
+    typeof raw === "object" &&
+    Object.prototype.toString.call(raw) === "[object ArrayBuffer]"
+  ) {
+    return new Uint8Array(raw as ArrayBuffer);
+  }
+  if (
+    raw &&
+    typeof raw === "object" &&
+    "data" in raw &&
+    Array.isArray((raw as { data: unknown }).data)
+  ) {
+    return Uint8Array.from((raw as { data: number[] }).data);
+  }
   return null;
 }
 
@@ -64,7 +83,11 @@ export async function decodeSpaPricesColumn(
     return raw;
   }
   const bytes = toUint8Array(raw);
-  if (!bytes) return null;
+  if (!bytes) {
+    throw new Error(
+      `SPA prices column is ${Object.prototype.toString.call(raw)}; cannot decode`,
+    );
+  }
   if (isGzipBytes(bytes)) return gunzipUtf8(bytes);
   return new TextDecoder().decode(bytes);
 }

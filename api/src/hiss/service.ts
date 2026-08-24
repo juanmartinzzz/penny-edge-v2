@@ -354,13 +354,18 @@ export async function foldHissFromStoredSample(
   }
 
   let prices = parsePricesJson(sample.prices_json);
+  if (prices.length === 0 && sample.symbol_count > 0) {
+    throw new Error(
+      `SPA sample ${sample.id} decoded empty but symbol_count is ${sample.symbol_count}`,
+    );
+  }
   let seeded = false;
-  if (!sampleHasNotebooks(prices)) {
+  if (!sampleHasNotebooks(prices) && prices.length > 0) {
     const hissRows = await listHissSymbolsForExchange(db, exchangeId);
     prices = attachHissNotebooksToPrices(prices, hissRows);
     seeded = true;
+    await updateSpaSamplePrices(db, sample.id, prices);
   }
-  await updateSpaSamplePrices(db, sample.id, prices);
 
   const result = await foldHissFromSample(db, {
     exchangeId: exchange.id,
