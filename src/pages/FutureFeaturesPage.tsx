@@ -8,8 +8,8 @@ import {
   CandlestickChart,
   ChevronDown,
   CircleCheck,
-  CircleDollarSign,
   CirclePause,
+  DollarSign,
   Gauge,
   LayoutTemplate,
   Lightbulb,
@@ -19,7 +19,7 @@ import {
   Shapes,
   Tag,
   Trash2,
-  Workflow,
+  Waypoints,
   type LucideIcon,
 } from "lucide-react";
 import { Button } from "../components/interaction/Button";
@@ -60,8 +60,8 @@ const TYPE_ICONS: Record<string, LucideIcon> = {
   market_data: CandlestickChart,
   alerting: Bell,
   scoring: Gauge,
-  automation: Workflow,
-  cost_control: CircleDollarSign,
+  automation: Waypoints,
+  cost_control: DollarSign,
   monitoring: Activity,
   ui: LayoutTemplate,
 };
