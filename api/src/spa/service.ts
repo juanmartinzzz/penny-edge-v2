@@ -430,10 +430,22 @@ export async function processSpaJob(
     }
 
     // Final page — merge staging pages, fold notebooks from the last photo, archive.
+    const current = await getSpaRun(env.DB, run.id);
+    if (!current || current.status === "ok" || current.status === "error") {
+      return;
+    }
+
     const staging = await listSpaRunPages(env.DB, run.id);
     let prices: SpaPricePoint[] = [];
     for (const row of staging) {
       prices.push(...parsePricesJson(row.quotes_json));
+    }
+
+    if (prices.length === 0) {
+      console.error(
+        `SPA run ${run.id} reached the final page with 0 quotes (scanned=${current.scanned}); skipping archive so we don't clobber the last photo`,
+      );
+      return;
     }
 
     const sampleId = crypto.randomUUID();

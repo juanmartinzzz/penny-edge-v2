@@ -222,6 +222,11 @@ export async function publishHissHotList(
   exchangeId: string,
   hot: HissUpsertInput[],
 ): Promise<{ updated: number; removed: number }> {
+  // An empty publish deletes the whole venue. Keep the previous list when
+  // this photo produced no temperatures (failed fold, first ticks, empty sample).
+  if (hot.length === 0) {
+    return { updated: 0, removed: 0 };
+  }
   if (hot.length > 90) {
     const removed = await deleteHissSymbolsOutsideIds(db, exchangeId, []);
     await upsertHissSymbolsBatch(db, hot);
@@ -286,8 +291,16 @@ export async function fattenQuotesForNewSample(
     quotes: SpaPricePoint[];
   },
 ): Promise<{ prices: SpaPricePoint[]; hot: HissUpsertInput[] }> {
-  const previousRow = await getLatestSpaSample(db, input.exchangeId);
-  const previous = parsePricesJson(previousRow?.prices_json ?? null);
+  let previous: SpaPricePoint[] = [];
+  try {
+    const previousRow = await getLatestSpaSample(db, input.exchangeId);
+    previous = parsePricesJson(previousRow?.prices_json ?? null);
+  } catch (error) {
+    console.error(
+      `Failed to decode previous SPA photo for ${input.exchangeId}; starting notebooks fresh`,
+      error,
+    );
+  }
   const bootstrap = await listHissSymbolsForExchange(db, input.exchangeId);
   return advanceSpaQuotes({
     previous,

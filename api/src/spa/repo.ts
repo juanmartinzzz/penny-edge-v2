@@ -357,6 +357,7 @@ export async function getLatestSpaSample(
     .prepare(
       `SELECT * FROM spa_samples
        WHERE exchange_id = ?
+         AND symbol_count > 0
        ORDER BY sampled_at DESC, created_at DESC
        LIMIT 1`,
     )

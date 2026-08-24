@@ -252,7 +252,9 @@ export function HissPage() {
               datetimeStat(
                 "Last fold",
                 overview?.lastUpdatedAt,
-                `Waiting for ${PRODUCT_NAMES.SPA}…`,
+                overview && overview.totalSymbols === 0
+                  ? "No hot list yet"
+                  : `Waiting for ${PRODUCT_NAMES.SPA}…`,
               ),
             ]}
           />
@@ -291,9 +293,9 @@ export function HissPage() {
             initialSort={[{ columnId: "temperature", direction: "desc" }]}
             empty={
               <p className="hiss-empty">
-                No symbols match these filters yet. Run{" "}
-                <AcronymLabel acronym="SPA" layout="inline" /> and wait for
-                folds — volume averages need completed calendar days.
+                {overview && overview.totalSymbols === 0
+                  ? "The hot list is empty. It fills from each SPA (Symbol Price Archive) photo (prefers ≥70, then 60, 50, …)."
+                  : "No symbols pass these volume filters."}
               </p>
             }
             renderExpanded={(row) => (
