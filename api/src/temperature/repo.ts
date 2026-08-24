@@ -167,11 +167,7 @@ export async function listAllWarmSymbolsWithTemperature(
     .prepare(
       `SELECT * FROM warm_symbols
        WHERE is_warm = 1
-       ORDER BY
-         CASE WHEN temperature IS NULL THEN 1 ELSE 0 END,
-         temperature DESC,
-         exchange ASC,
-         symbol ASC`,
+       ORDER BY temperature DESC, exchange ASC, symbol ASC`,
     )
     .all<WarmSymbolRow>();
   return result.results ?? [];

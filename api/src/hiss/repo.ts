@@ -93,11 +93,7 @@ export async function listHissSymbolsFiltered(
     .prepare(
       `SELECT * FROM hiss_symbols
        ${where}
-       ORDER BY
-         CASE WHEN temperature IS NULL THEN 1 ELSE 0 END,
-         temperature DESC,
-         exchange_code ASC,
-         symbol ASC
+       ORDER BY temperature DESC
        LIMIT ? OFFSET ?`,
     )
     .bind(...binds, limit, offset)

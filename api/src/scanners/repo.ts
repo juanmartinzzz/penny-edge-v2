@@ -237,7 +237,7 @@ export async function listWarmSymbols(
          temperature_run_id, cobuta_alerted, created_at, updated_at
        FROM warm_symbols
        WHERE scanner_id = ? AND is_warm = 1
-       ORDER BY (approx_daily_value IS NULL), approx_daily_value DESC, symbol ASC`,
+       ORDER BY approx_daily_value DESC, symbol ASC`,
     )
     .bind(scannerId)
     .all<WarmSymbolRow>();
