@@ -226,9 +226,9 @@ export function HissPage() {
           <AcronymLabel acronym="HISS" />
         </h1>
         <p>
-          Live per-symbol scores folded from each{" "}
-          <AcronymLabel acronym="SPA" layout="inline" /> sample. Filter by
-          average volume — no stored warm list. Independent of current{" "}
+          Live scores (≥70) projected from each{" "}
+          <AcronymLabel acronym="SPA" layout="inline" /> photo. Notebooks live
+          on the latest sample — this table is the hot list only, independent of{" "}
           <AcronymLabel acronym="HIS" layout="inline" />.
         </p>
       </header>

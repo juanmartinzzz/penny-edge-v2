@@ -1,6 +1,7 @@
 /**
  * Client for HISS — Heat Interest SPA Scores.
  */
+import { isHissHot } from "../../shared/hiss";
 import { apiFetch } from "./api";
 
 export type HissTemperatureComponents = {
@@ -77,16 +78,17 @@ export function listHissSymbols(query: HissSymbolsQuery = {}) {
 }
 
 export function foldHiss(body: { exchangeId: string; sampleId?: string }) {
-  return apiFetch<{ updated: number; sampleId: string }>("/hiss/fold", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  return apiFetch<{ updated: number; sampleId: string; seeded?: boolean }>(
+    "/hiss/fold",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    },
+  );
 }
 
-export function isHotHissTemperature(value: number | null | undefined): boolean {
-  return value != null && value >= 70;
-}
+export const isHotHissTemperature = isHissHot;
 
 const FILTERS_STORAGE_KEY = "penny-edge.hiss.filters";
 

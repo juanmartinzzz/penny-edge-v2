@@ -763,10 +763,10 @@ export function SpaPage() {
           <AcronymLabel acronym="SPA" />
         </h1>
         <p>
-          Append-only exchange-wide price archive. Samples last prices on a
-          per-venue interval (default 20 minutes), stores one snapshot per call
-          cycle, and keeps them for the retention window. Each venue has its own
-          open hours — independent of EVG.
+          Append-only exchange-wide price archive. Each new photo is the last
+          photo plus this run's vendor quotes (rolling notebooks travel with the
+          sample). Kept for the retention window. Each venue has its own open
+          hours — independent of EVG.
         </p>
       </header>
 

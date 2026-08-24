@@ -33,7 +33,7 @@ import {
   updateSpaExchange,
   updateSpaRun,
 } from "./repo";
-import { foldHissFromSample } from "../hiss/service";
+import { fattenQuotesForNewSample, publishHissHotList } from "../hiss/service";
 import {
   addMinutes,
   nowIso,
@@ -429,15 +429,33 @@ export async function processSpaJob(
       }
     }
 
-    // Final page — merge staging pages into one sample snapshot.
+    // Final page — merge staging pages, fold notebooks from the last photo, archive.
     const staging = await listSpaRunPages(env.DB, run.id);
-    const prices: SpaPricePoint[] = [];
+    let prices: SpaPricePoint[] = [];
     for (const row of staging) {
       prices.push(...parsePricesJson(row.quotes_json));
     }
 
     const sampleId = crypto.randomUUID();
     const finishedAt = nowIso();
+    let hot: Awaited<ReturnType<typeof fattenQuotesForNewSample>>["hot"] = [];
+    try {
+      const fattened = await fattenQuotesForNewSample(env.DB, {
+        exchangeId: exchange.id,
+        exchangeCode: exchange.code,
+        sampleId,
+        sampledAt: finishedAt,
+        quotes: prices,
+      });
+      prices = fattened.prices;
+      hot = fattened.hot;
+    } catch (hissError) {
+      console.error(
+        `SPA notebook merge failed for ${exchange.id}; archiving thin quotes`,
+        hissError,
+      );
+    }
+
     await insertSpaSample(env.DB, {
       id: sampleId,
       exchangeId: exchange.id,
@@ -447,18 +465,11 @@ export async function processSpaJob(
       calls,
     });
 
-    // HISS fold inline (simplest). Failures must not fail the SPA archive write.
     try {
-      await foldHissFromSample(env.DB, {
-        exchangeId: exchange.id,
-        exchangeCode: exchange.code,
-        sampleId,
-        sampledAt: finishedAt,
-        prices,
-      });
+      await publishHissHotList(env.DB, exchange.id, hot);
     } catch (hissError) {
       console.error(
-        `HISS fold failed after SPA sample ${sampleId}:`,
+        `HISS hot-list publish failed after SPA sample ${sampleId}:`,
         hissError,
       );
     }

@@ -64,7 +64,18 @@ export interface SpaSampleRow {
   created_at: string;
 }
 
-/** Compact archived quote (keeps JSON small). */
+/**
+ * D1 max row is 2MB. Cap is on uncompressed JSON (Worker memory).
+ * On disk we gzip prices_json; repeated notebook keys shrink a lot.
+ */
+export const SPA_SAMPLE_JSON_MAX_BYTES = 1_800_000;
+
+/**
+ * One symbol in a SPA photo.
+ * Thin (legacy): `{s,p,v?,vq?,n?}`.
+ * Fat: also carries the rolling notebook so the next photo is
+ * previous photo + new API quotes (no HISS table, no album walk).
+ */
 export type SpaPricePoint = {
   s: string;
   p: number | null;
@@ -76,7 +87,29 @@ export type SpaPricePoint = {
    */
   vq?: number | null;
   n?: string | null;
+  /** Rolling HISS notebook (price series, volume buckets). */
+  m?: unknown;
+  /** Last graded temperature from this photo. */
+  t?: number | null;
+  /** Volume last full UTC day. */
+  vd?: number | null;
+  /** Avg volume over sealed 10d buckets. */
+  va?: number | null;
+  /** How many sealed volume days exist. */
+  vc?: number;
 };
+
+export function sampleHasNotebooks(prices: SpaPricePoint[]): boolean {
+  return prices.some((point) => point.m != null);
+}
+
+export function assertSpaPricesJsonSize(json: string): void {
+  if (json.length > SPA_SAMPLE_JSON_MAX_BYTES) {
+    throw new Error(
+      `SPA sample JSON is ${json.length} bytes (max ${SPA_SAMPLE_JSON_MAX_BYTES}). Compact notebooks or split the venue.`,
+    );
+  }
+}
 
 export type SpaApiCall = {
   at: string;

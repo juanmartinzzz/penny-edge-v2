@@ -8,7 +8,8 @@ import type {
   SpaRunTrigger,
   SpaSampleRow,
 } from "./types";
-import { nowIso } from "./types";
+import { decodeSpaPricesColumn, encodeSpaPricesColumn } from "./gzip";
+import { assertSpaPricesJsonSize, nowIso } from "./types";
 
 export async function listSpaExchanges(
   db: D1Database,
@@ -310,6 +311,9 @@ export async function insertSpaSample(
   },
 ): Promise<SpaSampleRow> {
   const createdAt = nowIso();
+  const pricesJson = JSON.stringify(input.prices);
+  assertSpaPricesJsonSize(pricesJson);
+  const pricesColumn = await encodeSpaPricesColumn(pricesJson);
   await db
     .prepare(
       `INSERT INTO spa_samples (
@@ -323,7 +327,7 @@ export async function insertSpaSample(
       input.runId,
       input.sampledAt,
       input.prices.length,
-      JSON.stringify(input.prices),
+      pricesColumn,
       JSON.stringify(input.calls),
       createdAt,
     )
@@ -338,10 +342,52 @@ export async function getSpaSample(
   db: D1Database,
   sampleId: string,
 ): Promise<SpaSampleRow | null> {
-  return db
+  const row = await db
     .prepare(`SELECT * FROM spa_samples WHERE id = ?`)
     .bind(sampleId)
     .first<SpaSampleRow>();
+  return inflateSamplePrices(row);
+}
+
+export async function getLatestSpaSample(
+  db: D1Database,
+  exchangeId: string,
+): Promise<SpaSampleRow | null> {
+  const row = await db
+    .prepare(
+      `SELECT * FROM spa_samples
+       WHERE exchange_id = ?
+       ORDER BY sampled_at DESC, created_at DESC
+       LIMIT 1`,
+    )
+    .bind(exchangeId)
+    .first<SpaSampleRow>();
+  return inflateSamplePrices(row);
+}
+
+async function inflateSamplePrices(
+  row: SpaSampleRow | null,
+): Promise<SpaSampleRow | null> {
+  if (!row) return null;
+  const json = await decodeSpaPricesColumn(row.prices_json);
+  return { ...row, prices_json: json ?? "[]" };
+}
+
+/** Write notebooks (and gzip) onto an existing sample. */
+export async function updateSpaSamplePrices(
+  db: D1Database,
+  sampleId: string,
+  prices: SpaPricePoint[],
+): Promise<void> {
+  const pricesJson = JSON.stringify(prices);
+  assertSpaPricesJsonSize(pricesJson);
+  const pricesColumn = await encodeSpaPricesColumn(pricesJson);
+  await db
+    .prepare(
+      `UPDATE spa_samples SET prices_json = ?, symbol_count = ? WHERE id = ?`,
+    )
+    .bind(pricesColumn, prices.length, sampleId)
+    .run();
 }
 
 export async function listSpaSamples(
@@ -378,7 +424,10 @@ export async function listSpaSamplesChronological(
     )
     .bind(exchangeId)
     .all<SpaSampleRow>();
-  return result.results ?? [];
+  const rows = result.results ?? [];
+  return Promise.all(
+    rows.map(async (row) => (await inflateSamplePrices(row)) ?? row),
+  );
 }
 
 export async function countSpaSamples(

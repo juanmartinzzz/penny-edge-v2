@@ -217,3 +217,28 @@ export async function upsertHissSymbolsBatch(
     await db.batch(statements);
   }
 }
+
+export async function deleteHissSymbolsOutsideIds(
+  db: D1Database,
+  exchangeId: string,
+  keepIds: string[],
+): Promise<number> {
+  if (keepIds.length === 0) {
+    const result = await db
+      .prepare(`DELETE FROM hiss_symbols WHERE exchange_id = ?`)
+      .bind(exchangeId)
+      .run();
+    return result.meta.changes ?? 0;
+  }
+
+  const placeholders = keepIds.map(() => "?").join(", ");
+  const result = await db
+    .prepare(
+      `DELETE FROM hiss_symbols
+       WHERE exchange_id = ?
+         AND id NOT IN (${placeholders})`,
+    )
+    .bind(exchangeId, ...keepIds)
+    .run();
+  return result.meta.changes ?? 0;
+}

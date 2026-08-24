@@ -57,8 +57,8 @@ export const HISS_PRICE_MEMORY_MAX_POINTS = 120;
 export type HissPricePoint = { t: number; c: number };
 
 /**
- * Carried-forward memory. Must be enough to fold the next SPA tick
- * without re-reading spa_samples history.
+ * Carried-forward memory. Lives on each SPA photo (`prices_json[].m`)
+ * so the next sample is previous photo + new API quotes.
  */
 export type HissSymbolMemory = {
   v: 1;
@@ -136,10 +136,14 @@ export function utcDayKey(isoOrDate: string | Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function parseMemoryJson(raw: string | null | undefined): HissSymbolMemory {
+export function parseMemoryJson(
+  raw: string | object | null | undefined,
+): HissSymbolMemory {
   if (!raw) return emptyHissMemory();
   try {
-    const parsed = JSON.parse(raw) as Partial<HissSymbolMemory>;
+    const parsed = (
+      typeof raw === "string" ? JSON.parse(raw) : raw
+    ) as Partial<HissSymbolMemory>;
     if (parsed.v !== 1) return emptyHissMemory();
     return {
       v: 1,

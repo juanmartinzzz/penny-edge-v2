@@ -1,24 +1,27 @@
 /**
  * HISS — Heat Interest SPA Scores service.
- * Folds each SPA sample into the per-symbol ledger. Does not touch current HIS.
+ * Grades live on each SPA photo. The table is a hot list (≥70), not notebooks.
  */
+import { isHissHot } from "../../../shared/hiss";
 import { isBinanceExchange } from "../market/binance/constants";
 import {
+  getLatestSpaSample,
   getSpaExchange,
   getSpaSample,
   listSpaExchanges,
-  listSpaSamplesChronological,
+  updateSpaSamplePrices,
 } from "../spa/repo";
-import { parsePricesJson, type SpaPricePoint } from "../spa/types";
 import {
-  foldPriceObservation,
-  scoreHissTemperature,
-} from "./temperature";
+  parsePricesJson,
+  sampleHasNotebooks,
+  type SpaPricePoint,
+} from "../spa/types";
+import { foldPriceObservation, scoreHissTemperature } from "./temperature";
 import {
-  clearAllHissSymbols,
   countHissSymbols,
   countHissSymbolsByExchange,
   countHissSymbolsFiltered,
+  deleteHissSymbolsOutsideIds,
   getHissLatestUpdatedAt,
   listHissSymbolsFiltered,
   listHissSymbolsForExchange,
@@ -30,14 +33,10 @@ import {
   emptyHissMemory,
   nowIso,
   parseMemoryJson,
-  serializeMemory,
   type HissSymbolMemory,
   type HissSymbolRow,
 } from "./types";
-import {
-  foldVolumeObservation,
-  recordDailyClose,
-} from "./volume";
+import { foldVolumeObservation, recordDailyClose } from "./volume";
 
 export type HissFoldInput = {
   exchangeId: string;
@@ -45,16 +44,6 @@ export type HissFoldInput = {
   sampleId: string;
   sampledAt: string;
   prices: SpaPricePoint[];
-};
-
-type LedgerEntry = {
-  id: string;
-  symbol: string;
-  name: string | null;
-  memory: HissSymbolMemory;
-  createdAt: string;
-  temperatureAt: string | null;
-  lastUpsert: HissUpsertInput | null;
 };
 
 /**
@@ -71,8 +60,8 @@ export function volumeForHiss(
       return point.vq;
     }
     if (
-      point.v != null &&
       point.p != null &&
+      point.v != null &&
       Number.isFinite(point.v) &&
       Number.isFinite(point.p)
     ) {
@@ -86,57 +75,93 @@ export function volumeForHiss(
   return null;
 }
 
-function ledgerFromRows(rows: HissSymbolRow[]): Map<string, LedgerEntry> {
-  const map = new Map<string, LedgerEntry>();
+function memoryFromPoint(point: SpaPricePoint | undefined): HissSymbolMemory {
+  if (point?.m == null) return emptyHissMemory();
+  return parseMemoryJson(point.m);
+}
+
+function hissRowsBySymbol(rows: HissSymbolRow[]): Map<string, HissSymbolRow> {
+  const map = new Map<string, HissSymbolRow>();
   for (const row of rows) {
-    map.set(row.symbol, {
-      id: row.id,
-      symbol: row.symbol,
-      name: row.name,
-      memory: parseMemoryJson(row.memory_json),
-      createdAt: row.created_at,
-      temperatureAt: row.temperature_at,
-      lastUpsert: null,
-    });
+    map.set(row.symbol.trim().toUpperCase(), row);
   }
   return map;
 }
 
-/** Fold one SPA sample into an in-memory ledger. Returns upserts for symbols in this sample. */
-function applySampleToLedger(
-  ledger: Map<string, LedgerEntry>,
-  input: HissFoldInput,
-  at: string,
-): HissUpsertInput[] {
-  const upserts: HissUpsertInput[] = [];
-
-  for (const point of input.prices) {
+/** Copy existing HISS notebooks onto a thin SPA photo (no extra fold). */
+export function attachHissNotebooksToPrices(
+  prices: SpaPricePoint[],
+  hissRows: HissSymbolRow[],
+): SpaPricePoint[] {
+  const bySymbol = hissRowsBySymbol(hissRows);
+  return prices.map((point) => {
     const symbol = point.s?.trim().toUpperCase();
-    if (!symbol) continue;
+    const row = symbol ? bySymbol.get(symbol) : undefined;
+    if (!row) return point;
+    return {
+      ...point,
+      m: parseMemoryJson(row.memory_json),
+      t: row.temperature,
+      vd: row.volume_last_full_day,
+      va: row.avg_volume_10d,
+      vc: row.volume_coverage_days,
+    };
+  });
+}
 
-    const prev = ledger.get(symbol);
-    let memory = prev ? prev.memory : emptyHissMemory();
-    const vol = volumeForHiss(point, input.exchangeCode);
+function fatPointFromQuote(input: {
+  quote: SpaPricePoint;
+  previous: SpaPricePoint | undefined;
+  bootstrap: HissSymbolRow | undefined;
+  exchangeId: string;
+  exchangeCode: string;
+  sampleId: string;
+  sampledAt: string;
+  at: string;
+}): { point: SpaPricePoint; hot: HissUpsertInput | null } {
+  const symbol = input.quote.s?.trim().toUpperCase() ?? "";
+  let memory = memoryFromPoint(input.previous);
+  if (input.previous?.m == null && input.bootstrap) {
+    memory = parseMemoryJson(input.bootstrap.memory_json);
+  }
+  const vol = volumeForHiss(input.quote, input.exchangeCode);
+  const volFold = foldVolumeObservation(memory, input.sampledAt, vol);
+  memory = volFold.memory;
+  memory = foldPriceObservation(memory, input.sampledAt, input.quote.p);
+  memory = recordDailyClose(memory, input.sampledAt, input.quote.p);
+  const score = scoreHissTemperature(memory);
+  const name = input.quote.n?.trim() || input.bootstrap?.name || null;
+  const temperatureAt =
+    score.temperature != null
+      ? input.at
+      : (input.bootstrap?.temperature_at ?? null);
 
-    const volFold = foldVolumeObservation(memory, input.sampledAt, vol);
-    memory = volFold.memory;
-    memory = foldPriceObservation(memory, input.sampledAt, point.p);
-    memory = recordDailyClose(memory, input.sampledAt, point.p);
+  const point: SpaPricePoint = {
+    s: input.quote.s,
+    p: input.quote.p,
+    ...(input.quote.v != null ? { v: input.quote.v } : {}),
+    ...(input.quote.vq != null ? { vq: input.quote.vq } : {}),
+    ...(name ? { n: name } : {}),
+    m: memory,
+    t: score.temperature,
+    vd: volFold.volumeLastFullDay,
+    va: volFold.avgVolume10d,
+    vc: volFold.volumeCoverageDays,
+  };
 
-    const score = scoreHissTemperature(memory);
-    const createdAt = prev?.createdAt ?? at;
-    const id = prev?.id ?? crypto.randomUUID();
-    const name = point.n?.trim() || prev?.name || null;
-    const temperatureAt =
-      score.temperature != null ? at : (prev?.temperatureAt ?? null);
+  if (!symbol || !isHissHot(score.temperature)) {
+    return { point, hot: null };
+  }
 
-    const upsert: HissUpsertInput = {
-      id,
+  return {
+    point,
+    hot: {
+      id: input.bootstrap?.id ?? crypto.randomUUID(),
       exchangeId: input.exchangeId,
       exchangeCode: input.exchangeCode,
       symbol,
       name,
-      lastPrice: point.p,
+      lastPrice: input.quote.p,
       lastVolume: vol,
       lastSampleAt: input.sampledAt,
       lastSampleId: input.sampleId,
@@ -146,44 +171,161 @@ function applySampleToLedger(
       temperature: score.temperature,
       temperatureComponentsJson: JSON.stringify(score.components),
       temperatureAt,
-      memoryJson: serializeMemory(memory),
-      createdAt,
-      updatedAt: at,
-    };
+      memoryJson: "{}",
+      createdAt: input.bootstrap?.created_at ?? input.at,
+      updatedAt: input.at,
+    },
+  };
+}
 
-    ledger.set(symbol, {
-      id,
-      symbol,
-      name,
-      memory,
-      createdAt,
-      temperatureAt,
-      lastUpsert: upsert,
+/** Previous photo (or HISS bootstrap) + this run's API quotes → fat photo + hot list. */
+export function advanceSpaQuotes(input: {
+  previous: SpaPricePoint[];
+  quotes: SpaPricePoint[];
+  bootstrap: HissSymbolRow[];
+  exchangeId: string;
+  exchangeCode: string;
+  sampleId: string;
+  sampledAt: string;
+}): { prices: SpaPricePoint[]; hot: HissUpsertInput[] } {
+  const prevBySymbol = new Map<string, SpaPricePoint>();
+  for (const point of input.previous) {
+    const symbol = point.s?.trim().toUpperCase();
+    if (symbol) prevBySymbol.set(symbol, point);
+  }
+  const bootstrapBySymbol = hissRowsBySymbol(input.bootstrap);
+  const at = nowIso();
+  const prices: SpaPricePoint[] = [];
+  const hot: HissUpsertInput[] = [];
+
+  for (const quote of input.quotes) {
+    const symbol = quote.s?.trim().toUpperCase();
+    const { point, hot: hotRow } = fatPointFromQuote({
+      quote,
+      previous: symbol ? prevBySymbol.get(symbol) : undefined,
+      bootstrap: symbol ? bootstrapBySymbol.get(symbol) : undefined,
+      exchangeId: input.exchangeId,
+      exchangeCode: input.exchangeCode,
+      sampleId: input.sampleId,
+      sampledAt: input.sampledAt,
+      at,
     });
-    upserts.push(upsert);
+    prices.push(point);
+    if (hotRow) hot.push(hotRow);
   }
 
-  return upserts;
+  return { prices, hot };
+}
+
+export async function publishHissHotList(
+  db: D1Database,
+  exchangeId: string,
+  hot: HissUpsertInput[],
+): Promise<{ updated: number; removed: number }> {
+  if (hot.length > 90) {
+    const removed = await deleteHissSymbolsOutsideIds(db, exchangeId, []);
+    await upsertHissSymbolsBatch(db, hot);
+    return { updated: hot.length, removed };
+  }
+  await upsertHissSymbolsBatch(db, hot);
+  const removed = await deleteHissSymbolsOutsideIds(
+    db,
+    exchangeId,
+    hot.map((row) => row.id),
+  );
+  return { updated: hot.length, removed };
+}
+
+function hotFromFatPrices(
+  input: HissFoldInput,
+  bootstrap: HissSymbolRow[],
+): HissUpsertInput[] {
+  const bootstrapBySymbol = hissRowsBySymbol(bootstrap);
+  const at = nowIso();
+  const hot: HissUpsertInput[] = [];
+  for (const point of input.prices) {
+    const symbol = point.s?.trim().toUpperCase();
+    if (!symbol || !isHissHot(point.t ?? null)) continue;
+    const row = bootstrapBySymbol.get(symbol);
+    const vol = volumeForHiss(point, input.exchangeCode);
+    hot.push({
+      id: row?.id ?? crypto.randomUUID(),
+      exchangeId: input.exchangeId,
+      exchangeCode: input.exchangeCode,
+      symbol,
+      name: point.n?.trim() || row?.name || null,
+      lastPrice: point.p,
+      lastVolume: vol,
+      lastSampleAt: input.sampledAt,
+      lastSampleId: input.sampleId,
+      volumeLastFullDay: point.vd ?? null,
+      avgVolume10d: point.va ?? null,
+      volumeCoverageDays: point.vc ?? 0,
+      temperature: point.t ?? null,
+      temperatureComponentsJson: row?.temperature_components_json ?? null,
+      temperatureAt: row?.temperature_at ?? at,
+      memoryJson: "{}",
+      createdAt: row?.created_at ?? at,
+      updatedAt: at,
+    });
+  }
+  return hot;
+}
+
+/**
+ * Build the next fat photo from the latest sample + this run's thin API quotes.
+ * If the previous photo is still thin, notebooks come from hiss_symbols once.
+ */
+export async function fattenQuotesForNewSample(
+  db: D1Database,
+  input: {
+    exchangeId: string;
+    exchangeCode: string;
+    sampleId: string;
+    sampledAt: string;
+    quotes: SpaPricePoint[];
+  },
+): Promise<{ prices: SpaPricePoint[]; hot: HissUpsertInput[] }> {
+  const previousRow = await getLatestSpaSample(db, input.exchangeId);
+  const previous = parsePricesJson(previousRow?.prices_json ?? null);
+  const bootstrap = await listHissSymbolsForExchange(db, input.exchangeId);
+  return advanceSpaQuotes({
+    previous,
+    quotes: input.quotes,
+    bootstrap,
+    exchangeId: input.exchangeId,
+    exchangeCode: input.exchangeCode,
+    sampleId: input.sampleId,
+    sampledAt: input.sampledAt,
+  });
 }
 
 export async function foldHissFromSample(
   db: D1Database,
   input: HissFoldInput,
 ): Promise<{ updated: number }> {
-  const existing = await listHissSymbolsForExchange(db, input.exchangeId);
-  const ledger = ledgerFromRows(existing);
-  const upserts = applySampleToLedger(ledger, input, nowIso());
-  // Missing-from-sample: keep last (no delete / no touch).
-  await upsertHissSymbolsBatch(db, upserts);
-  return { updated: upserts.length };
+  const bootstrap = await listHissSymbolsForExchange(db, input.exchangeId);
+  const hot = sampleHasNotebooks(input.prices)
+    ? hotFromFatPrices(input, bootstrap)
+    : advanceSpaQuotes({
+        previous: [],
+        quotes: input.prices,
+        bootstrap,
+        exchangeId: input.exchangeId,
+        exchangeCode: input.exchangeCode,
+        sampleId: input.sampleId,
+        sampledAt: input.sampledAt,
+      }).hot;
+  const result = await publishHissHotList(db, input.exchangeId, hot);
+  return { updated: result.updated };
 }
 
-/** Manual / ops fold from a stored SPA sample. */
+/** Manual / ops: seed notebooks onto the latest thin photo, then publish the hot list. */
 export async function foldHissFromStoredSample(
   db: D1Database,
   exchangeId: string,
   sampleId?: string,
-): Promise<{ updated: number; sampleId: string }> {
+): Promise<{ updated: number; sampleId: string; seeded: boolean }> {
   const exchange = await getSpaExchange(db, exchangeId);
   if (!exchange) throw new Error("SPA exchange not found");
 
@@ -198,7 +340,15 @@ export async function foldHissFromStoredSample(
     throw new Error("SPA sample does not belong to this exchange");
   }
 
-  const prices = parsePricesJson(sample.prices_json);
+  let prices = parsePricesJson(sample.prices_json);
+  let seeded = false;
+  if (!sampleHasNotebooks(prices)) {
+    const hissRows = await listHissSymbolsForExchange(db, exchangeId);
+    prices = attachHissNotebooksToPrices(prices, hissRows);
+    seeded = true;
+  }
+  await updateSpaSamplePrices(db, sample.id, prices);
+
   const result = await foldHissFromSample(db, {
     exchangeId: exchange.id,
     exchangeCode: exchange.code,
@@ -207,12 +357,12 @@ export async function foldHissFromStoredSample(
     prices,
   });
 
-  return { updated: result.updated, sampleId: sample.id };
+  return { updated: result.updated, sampleId: sample.id, seeded };
 }
 
 /**
- * Wipe HISS and replay every SPA sample oldest→newest per exchange.
- * Ops / one-off backfill — not exposed in the UI.
+ * Publish the hot list from each venue's latest SPA photo.
+ * Seeds thin latest photos from remaining hiss_symbols rows first.
  */
 export async function backfillHissFromSpaArchive(db: D1Database): Promise<{
   cleared: number;
@@ -222,7 +372,6 @@ export async function backfillHissFromSpaArchive(db: D1Database): Promise<{
     symbols: number;
   }>;
 }> {
-  const cleared = await clearAllHissSymbols(db);
   const exchanges = await listSpaExchanges(db);
   const report: Array<{
     exchangeCode: string;
@@ -231,8 +380,7 @@ export async function backfillHissFromSpaArchive(db: D1Database): Promise<{
   }> = [];
 
   for (const exchange of exchanges) {
-    const samples = await listSpaSamplesChronological(db, exchange.id);
-    if (samples.length === 0) {
+    if (!exchange.last_sample_id) {
       report.push({
         exchangeCode: exchange.code,
         samples: 0,
@@ -240,40 +388,15 @@ export async function backfillHissFromSpaArchive(db: D1Database): Promise<{
       });
       continue;
     }
-
-    const ledger = new Map<string, LedgerEntry>();
-    let at = nowIso();
-
-    for (const sample of samples) {
-      at = nowIso();
-      const prices = parsePricesJson(sample.prices_json);
-      applySampleToLedger(
-        ledger,
-        {
-          exchangeId: exchange.id,
-          exchangeCode: exchange.code,
-          sampleId: sample.id,
-          sampledAt: sample.sampled_at,
-          prices,
-        },
-        at,
-      );
-    }
-
-    const upserts: HissUpsertInput[] = [];
-    for (const entry of ledger.values()) {
-      if (entry.lastUpsert) upserts.push(entry.lastUpsert);
-    }
-    await upsertHissSymbolsBatch(db, upserts);
-
+    const result = await foldHissFromStoredSample(db, exchange.id);
     report.push({
       exchangeCode: exchange.code,
-      samples: samples.length,
-      symbols: upserts.length,
+      samples: 1,
+      symbols: result.updated,
     });
   }
 
-  return { cleared, exchanges: report };
+  return { cleared: 0, exchanges: report };
 }
 
 export async function getHissOverview(db: D1Database) {
