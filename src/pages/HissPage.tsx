@@ -170,7 +170,7 @@ export function HissPage() {
       id: "volumes",
       title: "Volume filters",
       description:
-        "Hide hot-list names below these mins. Leave blank to show the full hot list.",
+        "Only symbols that clear these mins are listed. Leave blank for any.",
       columns: [
         <NumericInput
           key="avg10d"
