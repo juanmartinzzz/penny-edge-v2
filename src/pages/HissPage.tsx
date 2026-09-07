@@ -21,6 +21,9 @@ import { formatDateTime } from "../lib/dates";
 import { formatAdaptiveNumber, formatCompactVolume } from "../lib/formatNumber";
 import {
   getHissOverview,
+  HISS_HOT_FALLBACK_MAX_ROWS,
+  HISS_HOT_MIN_TEMPERATURE,
+  HISS_HOT_THRESHOLD_STEP,
   isHotHissTemperature,
   listHissSymbols,
   loadHissFilterDefaults,
@@ -236,10 +239,13 @@ export function HissPage() {
         </h1>
         <p>
           Live scores from each{" "}
-          <AcronymLabel acronym="SPA" layout="inline" /> photo. Prefers ≥70; if
-          none qualify, the cutoff drops by 10 until the list is non-empty.
-          Notebooks live on the latest sample — this table is the hot list only,
-          independent of <AcronymLabel acronym="HIS" layout="inline" />.
+          <AcronymLabel acronym="SPA" layout="inline" /> photo. Every name at
+          {` ≥${HISS_HOT_MIN_TEMPERATURE} `}
+          is kept. If none qualify, the cutoff drops by{" "}
+          {HISS_HOT_THRESHOLD_STEP} and at most {HISS_HOT_FALLBACK_MAX_ROWS}{" "}
+          names are kept. Notebooks live on the latest sample — this table is
+          the hot list only, independent of{" "}
+          <AcronymLabel acronym="HIS" layout="inline" />.
         </p>
       </header>
 
@@ -304,7 +310,7 @@ export function HissPage() {
             empty={
               <p className="hiss-empty">
                 {overview && overview.totalSymbols === 0
-                  ? "The hot list is empty. It fills from each SPA (Symbol Price Archive) photo (prefers ≥70, then 60, 50, …)."
+                  ? `The hot list is empty. It fills from each SPA (Symbol Price Archive) photo (every name at ≥${HISS_HOT_MIN_TEMPERATURE}, otherwise at most ${HISS_HOT_FALLBACK_MAX_ROWS}).`
                   : "No symbols pass these volume filters."}
               </p>
             }

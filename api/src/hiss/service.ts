@@ -1,6 +1,6 @@
 /**
  * HISS — Heat Interest SPA Scores service.
- * Grades live on each SPA photo. The table is a hot list (prefers ≥70), not notebooks.
+ * Grades live on each SPA photo. The table is a hot list (all ≥70, else at most 10), not notebooks.
  */
 import { selectHissHotRows } from "../../../shared/hiss";
 import { isBinanceExchange } from "../market/binance/constants";

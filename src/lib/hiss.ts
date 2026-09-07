@@ -1,8 +1,19 @@
 /**
  * Client for HISS — Heat Interest SPA Scores.
  */
-import { isHissHot } from "../../shared/hiss";
+import {
+  HISS_HOT_FALLBACK_MAX_ROWS,
+  HISS_HOT_MIN_TEMPERATURE,
+  HISS_HOT_THRESHOLD_STEP,
+  isHissHot,
+} from "../../shared/hiss";
 import { apiFetch } from "./api";
+
+export {
+  HISS_HOT_FALLBACK_MAX_ROWS,
+  HISS_HOT_MIN_TEMPERATURE,
+  HISS_HOT_THRESHOLD_STEP,
+};
 
 export type HissTemperatureComponents = {
   retW: number | null;
